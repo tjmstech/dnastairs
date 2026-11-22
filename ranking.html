@@ -90,8 +90,8 @@ select.tab{appearance:none;-webkit-appearance:none}
       <button class="b gray" id="logoutBtn" style="margin-top:8px">관리자 모드 끄기</button>
       <div class="err" id="admErr"></div>
       <details class="roster">
-        <summary>학생 명단 관리</summary>
-        <div class="rnote">명단에 있는 학번 + 이름으로만 로그인할 수 있어요. 모든 게임이 같은 명단을 써요.</div>
+        <summary>DNA 계단 명단 관리</summary>
+        <div class="rnote">이 명단은 <b>DNA 계단 전용</b>이에요. 여기에 올린 학번 + 이름으로만 DNA 계단에 로그인할 수 있어요. 카우런·오델로 명단은 바뀌지 않아요.<br>명단을 올리기 전에는 학생이 들어올 수 없어요. 미리 테스트하려면 아래 '학번 조회·수정'으로 00000 / test만 먼저 넣으세요.</div>
         <div class="rrow"><b>명단 파일 올리기</b><input type="file" id="rosFile" accept=".json,application/json"><button class="b red" id="rosUp">올리기</button></div>
         <div class="rnote">roster.json을 고르고 올리면 기존 명단을 통째로 바꿔요.</div>
         <div class="rrow"><b>학번 조회·수정</b><input id="rosId" inputmode="numeric" maxlength="5" placeholder="학번 5자리" style="width:96px"><button class="b" id="rosLook">조회</button></div>
@@ -232,17 +232,17 @@ connect();
     if(!ids.length){msg('명단 형식이 아니에요.');return;}
     const b=$('rosUp');if(!b.dataset.arm){b.dataset.arm=1;b.textContent=`${ids.length}명으로 바꿀까요? 한 번 더`;setTimeout(()=>{delete b.dataset.arm;b.textContent='올리기';},4000);return;}
     delete b.dataset.arm;b.textContent='올리는 중…';
-    try{await req('PUT','/roster',d);msg(`명단을 올렸어요. 총 ${ids.length}개 학번이에요.`);}catch(e){msg(e.message);}
+    try{await req('PUT','/dna/roster',d);msg(`DNA 계단 명단을 올렸어요. 총 ${ids.length}개 학번이에요.`);}catch(e){msg(e.message);}
     b.textContent='올리기';
   };
-  $('rosLook').onclick=async()=>{const id=sid();if(!id)return;try{const v=await req('GET','/roster/'+id);msg(v?`${id}: ${Object.keys(v).join(', ')}`:`${id}: 명단에 없어요`);}catch(e){msg(e.message);}};
+  $('rosLook').onclick=async()=>{const id=sid();if(!id)return;try{const v=await req('GET','/dna/roster/'+id);msg(v?`${id}: ${Object.keys(v).join(', ')}`:`${id}: 명단에 없어요`);}catch(e){msg(e.message);}};
   $('rosAdd').onclick=async()=>{const id=sid();if(!id)return;const n=$('rosName').value.replace(/\s+/g,'');
     if(!n||n.length>30||/[.$#\[\]\/]/.test(n)){msg('이름을 1~30자로 적어 주세요. 기호 . $ # [ ] / 는 쓸 수 없어요.');return;}
-    try{await req('PATCH','/roster/'+id,{[n]:true});msg(`${id} ${n} 을(를) 명단에 넣었어요.`);$('rosName').value='';}catch(e){msg(e.message);}};
+    try{await req('PATCH','/dna/roster/'+id,{[n]:true});msg(`${id} ${n} 을(를) 명단에 넣었어요.`);$('rosName').value='';}catch(e){msg(e.message);}};
   $('rosDel').onclick=async()=>{const id=sid();if(!id)return;const b=$('rosDel');
     if(!b.dataset.arm){b.dataset.arm=1;b.textContent='정말 삭제? 한 번 더';setTimeout(()=>{delete b.dataset.arm;b.textContent='이 학번 삭제';},3000);return;}
     delete b.dataset.arm;b.textContent='이 학번 삭제';
-    try{await req('DELETE','/roster/'+id);msg(`${id} 을(를) 명단에서 지웠어요. 이제 이 학번으로는 로그인할 수 없어요.`);}catch(e){msg(e.message);}};
+    try{await req('DELETE','/dna/roster/'+id);msg(`${id} 을(를) 명단에서 지웠어요. 이제 이 학번으로는 로그인할 수 없어요.`);}catch(e){msg(e.message);}};
 })();
 </script>
 </body>

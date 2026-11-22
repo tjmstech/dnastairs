@@ -525,8 +525,9 @@ async function doLogin(){
   const b=$('doLogin');if(b.disabled)return;b.disabled=true;b.textContent='확인 중…';
   try{
     // 명단에 있는 학번과 이름으로만 들어올 수 있어요 (전출 학생 학번은 명단에 없어요)
-    const ros=await dbGet('/roster/'+id);
-    if(!ros)throw new Error('명단에 없는 학번이에요. 학번을 다시 확인해 주세요.');
+    // DNA 계단 전용 명단: 선생님이 이 게임 랭킹창에서 명단을 올려야 들어올 수 있어요
+    const ros=await dbGet('/dna/roster/'+id);
+    if(!ros)throw new Error('아직 DNA 계단 명단에 없는 학번이에요. 선생님이 열어 주시면 할 수 있어요.');
     const ks=Object.keys(ros).filter(k=>ros[k]===true);
     const name=ks.find(k=>k===raw)||ks.find(k=>k.toLowerCase()===raw.toLowerCase());
     if(!name)throw new Error('학번과 이름이 맞지 않아요.');
@@ -564,6 +565,8 @@ async function autoLogin(){
     await token();
     const rec=await dbGet('/vo/players/'+ME.id);
     if(!rec||rec.uid!==ME.uid){ME=null;persist();toast('계정이 초기화되었어요.<br>다시 로그인해 주세요.',2000);renderMain();return;}
+    const ros=await dbGet('/dna/roster/'+ME.id);
+    if(!ros){ME=null;persist();renderMain();return;}
     ME.rec=rec;await loadDna();if(!unlocked(charId))charId='poly';
   }catch(e){ME=null;persist();}
   renderMain();
