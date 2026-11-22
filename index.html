@@ -59,6 +59,7 @@ h2{font-size:30px;margin:0 0 4px;font-weight:400;text-shadow:3px 3px 0 #0b0f2a}
 .ch canvas{width:min(22vw,88px);height:min(20vw,80px);display:block;margin:0 auto 2px}
 .ch .nm{font-size:16px}
 .ch .ds{font-size:11px;opacity:.8;line-height:1.3;margin-top:2px;min-height:29px;word-break:keep-all}
+.ch .cr{font-size:9px;font-family:system-ui,sans-serif;color:#a9b0e0;margin-top:2px;letter-spacing:.02em;white-space:nowrap}
 .ch.sel{background:#2f3a8a;outline:4px solid #ffcf4a;outline-offset:-2px}
 .ch.sel::after{content:'선택';position:absolute;top:-10px;right:-6px;background:#ffcf4a;color:#0b0f2a;font-size:13px;padding:1px 6px;border:3px solid #0b0f2a}
 /* 로그인·랭킹 */
@@ -132,6 +133,7 @@ a.sec.rk{text-decoration:none;box-sizing:border-box}
     <button class="big" id="startBtn">시작하기</button>
     <div class="links">
       <a id="lnkRank" href="ranking.html">랭킹 보기</a>
+      <a id="lnkHub" href="../">다른 게임</a>
       <button id="goPw">비밀번호 변경</button>
       <button id="logout">로그아웃</button>
     </div>
@@ -227,14 +229,17 @@ const buf=document.createElement('canvas'),bufb=buf.getContext('2d');let b=bufb;
 const fx=document.createElement('canvas'),fxb=fx.getContext('2d');
 let W=0,H=0,DPR=1,PX=3,BW=130,BH=260;
 function resize(){
-  const vv=window.visualViewport;
-  W=Math.round(vv?vv.width:innerWidth);H=Math.round(vv?vv.height:innerHeight);
+  // 화면 전체 크기 기준 (키보드가 열려 있을 때 줄어든 크기를 쓰지 않게 해요)
+  W=Math.round(innerWidth);H=Math.round(innerHeight);
   DPR=Math.min(window.devicePixelRatio||1,2);
   cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);cv.style.width=W+'px';cv.style.height=H+'px';
   PX=Math.max(2,Math.round(Math.min(W/130,H/250)));
   BW=Math.ceil(W/PX);BH=Math.ceil(H/PX);buf.width=BW;buf.height=BH;fx.width=BW;fx.height=BH;
 }
 addEventListener('resize',resize);if(window.visualViewport)visualViewport.addEventListener('resize',resize);resize();
+// 아이폰: 로그인 키보드가 닫힌 뒤 크기 변경 알림이 늦거나 안 올 때가 있어서 한 번 더 확인해요
+addEventListener('focusout',()=>{setTimeout(resize,100);setTimeout(resize,500);});addEventListener('orientationchange',()=>setTimeout(resize,300));
+setInterval(()=>{if(Math.round(innerWidth)!==W||Math.round(innerHeight)!==H)resize();},500);
 
 /* ---------- 픽셀 그리기 도구 ---------- */
 function R(x,y,w,h,c){b.fillStyle=c;b.fillRect(Math.round(x),Math.round(y),w,h);}
@@ -270,7 +275,7 @@ const CHARS=[
   {id:'sci',name:'과학자',desc:'DNA의 비밀을 파헤치는 과학자',need:200},
   {id:'snuppy',name:'스너피',desc:'세계 최초의 복제 개',need:400},
   {id:'dolly',name:'돌리',desc:'세계 최초의 체세포 복제 포유류',need:600},
-  {id:'snuwolf',name:'스널피',desc:'세계 최초의 복제 늑대',need:1000}
+  {id:'snuwolf',name:'스널피',desc:'세계 최초의 복제 늑대',need:1000,credit:'Designed by Mocha'}
 ];
 const ZONES=[
   {at:0,name:'세포핵 속',draw:bgNucleus},
@@ -318,6 +323,7 @@ function fanfare(){[660,880,1100].forEach((f,i)=>setTimeout(()=>beep(f,.12,'squa
 /* ---------- 화면 전환 ---------- */
 function show(id){for(const s of ['menu','pick','over','pause','login','pw'])$(s).classList.toggle('show',s===id);}
 function startGame(){
+  resize();
   if(ONLINE&&!ME){openLogin();return;}
   if(!unlocked(charId))charId='poly';
   startRun();
@@ -505,7 +511,7 @@ function renderMain(){
   if(logged){$('mName').textContent=ME.id+ME.rec.name;$('mTop').textContent=ME.dna.top||0;$('mBest').textContent=ME.dna.best||0;}
   else if(!ONLINE){$('mName').textContent='미리보기';$('mTop').textContent=localTop;$('mBest').textContent='-';}
   $('startBtn').textContent=ONLINE&&!logged?'로그인하고 시작':'시작하기';
-  $('lnkRank').style.display=ONLINE?'':'none';$('goPw').style.display=logged?'':'none';$('logout').style.display=logged?'':'none';
+  $('lnkRank').style.display=ONLINE?'':'none';$('lnkHub').style.display=ONLINE?'':'none';$('goPw').style.display=logged?'':'none';$('logout').style.display=logged?'':'none';
   const N=$('mNote');
   if(!ONLINE){N.innerHTML=`미리보기 화면이라 로그인 없이 해 볼 수 있어요. 기록은 이 기기에만 남아요.<br><a href="#" id="pvAll" style="color:#ffcf4a">${previewAll?'잠금 다시 걸기':'확인용: 캐릭터 잠금 모두 풀기'}</a>`;
     $('pvAll').onclick=e=>{e.preventDefault();previewAll=!previewAll;renderMain();};}
@@ -605,6 +611,7 @@ function buildPick(){
       charId=c.id;if(!seen.includes(c.id))seen.push(c.id);d.classList.remove('new');
       try{localStorage.setItem('dnaChar',charId);localStorage.setItem('dnaSeen',JSON.stringify(seen));}catch(e){}
       box.querySelectorAll('.ch').forEach(x=>x.classList.remove('sel'));d.classList.add('sel');beep(700,.06,'square',.03);};
+    if(c.credit)d.insertAdjacentHTML('beforeend',`<div class="cr">${c.credit}</div>`);
     box.appendChild(d);
     paintChar(cvs,c.id,false);
   }
