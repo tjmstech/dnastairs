@@ -29,7 +29,7 @@ select.tab{appearance:none;-webkit-appearance:none}
 .rk{text-align:center;font-family:'Press Start 2P',monospace;font-size:12px;color:#a9b0e0}
 .r1 .rk{color:#ffcf4a}.r2 .rk{color:#e3e7f5}.r3 .rk{color:#f0a868}
 .r1{background:#3a3160}.r1,.r2,.r3{border-color:#0b0f2a}
-.ic{width:44px;height:40px;display:block}
+.ic{width:44px;height:40px;display:block;image-rendering:pixelated}
 .nm{font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sub{font-size:13px;color:#a9b0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sc{text-align:right;white-space:nowrap}
@@ -120,23 +120,23 @@ const SPR={"poly": {"pal": {"k": "#123a32", "b": "#7fe0c0", "B": "#b8f5df", "O":
 "s": 0.5}};
 const $=id=>document.getElementById(id);
 const C=window.COWRUN_CONFIG||{},DB=(C.databaseURL||'').replace(/\/+$/,'');
-const CN={poly:'중합효소',frog:'개구리',sci:'과학자',snuppy:'스너피',dolly:'돌리',snuwolf:'스널피'};
-const ZONES=[[0,'세포핵 속'],[100,'세포 속'],[200,'혈관 속'],[300,'실험실'],[500,'하늘'],[800,'우주']];
-function zone(h){let z=0;for(let i=0;i<ZONES.length;i++)if(h>=ZONES[i][0])z=i;return `STAGE ${z+1} ${ZONES[z][1]}`;}
 const ICON={};
+// 기기 화면 픽셀 수에 정확히 맞춘 캔버스에 그려요. (그림을 늘리거나 줄이지 않아서 칸 사이에 줄이 생기지 않아요)
 function icon(id){
   if(!SPR[id])id='poly';
-  if(!ICON[id]){
+  const R=window.devicePixelRatio||1,CW=Math.round(44*R),CH=Math.round(40*R);
+  const key=id+'@'+CW;
+  if(!ICON[key]){
     const sp=SPR[id],u=sp.s||1,rows=sp.rows,w=Math.max(...rows.map(r=>r.length)),h=rows.length;
-    // 화면 픽셀에 딱 맞춰 그려서 칸 사이에 틈(격자)이 생기지 않게 해요
-    const D=Math.max(2,Math.ceil(window.devicePixelRatio||1)),CW=44*D,CH=40*D;
     const cv=document.createElement('canvas');cv.width=CW;cv.height=CH;const g=cv.getContext('2d');
     const K=Math.min((CW-2)/(w*u),(CH-2)/(h*u));const pal=Object.assign({},sp.pal);if(id==='poly'){pal.X='#47b8ff';pal.Y='#2079c2';pal.Z='#a6dcff';}
     const ox=(CW-w*u*K)/2,oy=CH-1-h*u*K,P=v=>Math.round(v);
     rows.forEach((r,j)=>{const y0=P(oy+j*u*K),y1=P(oy+(j+1)*u*K);for(let i=0;i<r.length;i++){const c=r[i];if(c==='.'||!pal[c])continue;const x0=P(ox+i*u*K),x1=P(ox+(i+1)*u*K);g.fillStyle=pal[c];g.fillRect(x0,y0,x1-x0,y1-y0);}});
-    ICON[id]=cv.toDataURL();
+    ICON[key]=cv;
   }
-  return ICON[id];
+  const src=ICON[key],c=document.createElement('canvas');c.width=CW;c.height=CH;c.className='ic';
+  c.style.width=(CW/R)+'px';c.style.height=(CH/R)+'px';c.getContext('2d').drawImage(src,0,0);
+  return c;
 }
 function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;}
 function clsName(c){return `${c[0]}학년 ${+c.slice(1,3)}반`;}
@@ -160,7 +160,7 @@ function render(){
     const rk=(r.best||0)>0?r.rank:null,crk=cls&&rk?ranked.filter(x=>x.id.startsWith(cls)).findIndex(x=>x.id===r.id)+1:rk;
     const row=el('div','row'+(crk&&crk<=3?' r'+crk:'')+(r.id===myId?' me':''));
     row.appendChild(el('div','rk',crk?String(crk):'-'));
-    const im=el('img','ic');im.src=icon(r.bc||'poly');im.alt=CN[r.bc]||'';row.appendChild(im);
+    row.appendChild(icon(r.bc||'poly'));
     const mid=el('div');mid.appendChild(el('div','nm',r.id+r.name));
     const subT=[cls&&rk?`전교 ${rk}위`:'',admin?(rk?'':'랭킹 미등록 · ')+`내 최고 ${r.top||0} · ${r.plays||0}판`:''].filter(Boolean).join(' · ');
     if(subT)mid.appendChild(el('div','sub',subT));row.appendChild(mid);
