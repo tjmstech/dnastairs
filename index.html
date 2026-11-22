@@ -276,9 +276,9 @@ const ZONES=[
   {at:0,name:'세포핵 속',draw:bgNucleus},
   {at:100,name:'세포 속',draw:bgCell},
   {at:200,name:'혈관 속',draw:bgBlood},
-  {at:300,name:'실험실',draw:bgLab},
-  {at:500,name:'하늘',draw:bgSky},
-  {at:800,name:'우주',draw:bgSpace}
+  {at:400,name:'실험실',draw:bgLab},
+  {at:600,name:'하늘',draw:bgSky},
+  {at:1000,name:'우주',draw:bgSpace}
 ];
 let charId='poly',localTop=0,previewAll=false,seen=['poly'];
 try{localTop=+localStorage.getItem('dnaBest')||0;charId=localStorage.getItem('dnaChar')||'poly';seen=JSON.parse(localStorage.getItem('dnaSeen')||'["poly"]');}catch(e){}
@@ -469,8 +469,9 @@ function saveDna(fn){
     Object.assign(ME.dna,body);delete ME.dna.t;
     return true;
   });
-  dnaChain=job.catch(async()=>{
-    toast('기록 저장에 실패했어요.<br>인터넷을 확인해 주세요.',2000);
+  dnaChain=job.catch(async e=>{
+    const m=String(e&&e.message||e);
+    toast(/HTTP 40[13]/.test(m)?'서버가 기록을 받지 않았어요.<br>(규칙 확인 필요 · '+m+')':'기록 저장에 실패했어요.<br>인터넷을 확인해 주세요.',2600);
     try{const r=await dbGet('/dna/players/'+ME.id);if(r)ME.dna=r;}catch(e){}
     renderMain();
   });
