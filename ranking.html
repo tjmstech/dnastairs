@@ -24,16 +24,17 @@ h1{margin:4px 0 0;text-align:center;font-weight:400;font-size:40px;letter-spacin
 .tab.on{background:#ffcf4a;color:#0b0f2a}
 select.tab{appearance:none;-webkit-appearance:none}
 .board{background:#141a44;border:4px solid #fff;box-shadow:0 0 0 4px #0b0f2a,8px 8px 0 4px rgba(0,0,0,.35);padding:8px}
-.row{display:grid;grid-template-columns:40px 52px minmax(0,1fr) auto;gap:8px;align-items:center;background:#1c2358;border:3px solid #0b0f2a;box-shadow:inset -3px -3px 0 #141a44,inset 3px 3px 0 #2e3780;padding:5px 10px 5px 6px;margin:5px 0}
+.row{display:grid;grid-template-columns:28px 44px minmax(0,1fr) auto;gap:6px;align-items:center;background:#1c2358;border:3px solid #0b0f2a;box-shadow:inset -3px -3px 0 #141a44,inset 3px 3px 0 #2e3780;padding:5px 10px 5px 6px;margin:5px 0}
 .row.me{outline:3px solid #ffcf4a;outline-offset:-1px}
-.rk{text-align:center;font-family:'Press Start 2P',monospace;font-size:14px;color:#a9b0e0}
+.rk{text-align:center;font-family:'Press Start 2P',monospace;font-size:12px;color:#a9b0e0}
 .r1 .rk{color:#ffcf4a}.r2 .rk{color:#e3e7f5}.r3 .rk{color:#f0a868}
 .r1{background:#3a3160}.r1,.r2,.r3{border-color:#0b0f2a}
-.ic{width:52px;height:46px;display:block;image-rendering:pixelated}
-.nm{font-size:19px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ic{width:44px;height:40px;display:block}
+.nm{font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sub{font-size:13px;color:#a9b0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sc{text-align:right;white-space:nowrap}
-.sc b{font-family:'Press Start 2P',monospace;font-weight:400;font-size:17px;color:#ffcf4a}
+.sc{min-width:84px}
+.sc b{font-family:'Press Start 2P',monospace;font-weight:400;font-size:13px;color:#ffcf4a;letter-spacing:-1px}
 .sc small{font-size:14px;margin-left:3px}
 .empty{text-align:center;padding:26px 10px;color:#a9b0e0}
 .adm{margin-top:20px;text-align:center}
@@ -127,10 +128,12 @@ function icon(id){
   if(!SPR[id])id='poly';
   if(!ICON[id]){
     const sp=SPR[id],u=sp.s||1,rows=sp.rows,w=Math.max(...rows.map(r=>r.length)),h=rows.length;
-    const cv=document.createElement('canvas');cv.width=104;cv.height=92;const g=cv.getContext('2d');
-    const K=Math.min(2*2,100/(w*u),88/(h*u));const pal=Object.assign({},sp.pal);if(id==='poly'){pal.X='#47b8ff';pal.Y='#2079c2';pal.Z='#a6dcff';}
-    const ox=Math.round((104-w*u*K)/2),oy=Math.round(90-h*u*K),ps=Math.max(1,Math.round(u*K));
-    rows.forEach((r,j)=>{for(let i=0;i<r.length;i++){const c=r[i];if(c==='.'||!pal[c])continue;g.fillStyle=pal[c];g.fillRect(ox+Math.round(i*u*K),oy+Math.round(j*u*K),ps,ps);}});
+    // 화면 픽셀에 딱 맞춰 그려서 칸 사이에 틈(격자)이 생기지 않게 해요
+    const D=Math.max(2,Math.ceil(window.devicePixelRatio||1)),CW=44*D,CH=40*D;
+    const cv=document.createElement('canvas');cv.width=CW;cv.height=CH;const g=cv.getContext('2d');
+    const K=Math.min((CW-2)/(w*u),(CH-2)/(h*u));const pal=Object.assign({},sp.pal);if(id==='poly'){pal.X='#47b8ff';pal.Y='#2079c2';pal.Z='#a6dcff';}
+    const ox=(CW-w*u*K)/2,oy=CH-1-h*u*K,P=v=>Math.round(v);
+    rows.forEach((r,j)=>{const y0=P(oy+j*u*K),y1=P(oy+(j+1)*u*K);for(let i=0;i<r.length;i++){const c=r[i];if(c==='.'||!pal[c])continue;const x0=P(ox+i*u*K),x1=P(ox+(i+1)*u*K);g.fillStyle=pal[c];g.fillRect(x0,y0,x1-x0,y1-y0);}});
     ICON[id]=cv.toDataURL();
   }
   return ICON[id];
@@ -159,7 +162,8 @@ function render(){
     row.appendChild(el('div','rk',crk?String(crk):'-'));
     const im=el('img','ic');im.src=icon(r.bc||'poly');im.alt=CN[r.bc]||'';row.appendChild(im);
     const mid=el('div');mid.appendChild(el('div','nm',r.id+r.name));
-    mid.appendChild(el('div','sub',(rk?`${CN[r.bc]||'중합효소'} · ${zone(r.best)}`:'랭킹 미등록')+(cls&&rk?` · 전교 ${rk}위`:'')+(admin?` · 내 최고 ${r.top||0} · ${r.plays||0}판`:'')));row.appendChild(mid);
+    const subT=[cls&&rk?`전교 ${rk}위`:'',admin?(rk?'':'랭킹 미등록 · ')+`내 최고 ${r.top||0} · ${r.plays||0}판`:''].filter(Boolean).join(' · ');
+    if(subT)mid.appendChild(el('div','sub',subT));row.appendChild(mid);
     const sc=el('div','sc');sc.innerHTML=`<b>${r.best||0}</b><small>쌍</small>`;row.appendChild(sc);
     if(admin)row.appendChild(tools(r));
     L.appendChild(row);
