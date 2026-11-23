@@ -65,9 +65,17 @@ h2{font-size:30px;margin:0 0 4px;font-weight:400;text-shadow:3px 3px 0 #0b0f2a}
 .ch.sel{background:#2f3a8a;outline:4px solid #ffcf4a;outline-offset:-2px}
 .ch.sel::after{content:'선택';position:absolute;top:-10px;right:-6px;background:#ffcf4a;color:#0b0f2a;font-size:13px;padding:1px 6px;border:3px solid #0b0f2a}
 /* 로그인·랭킹 */
-.user{margin-top:16px;padding:10px 12px}
-.unm{font-size:21px}
-.ust{font-size:14px;opacity:.9;margin-top:4px}.ust .px{font-size:11px;color:#ffcf4a}
+.user{margin-top:16px;padding:12px;align-items:center;gap:12px;text-align:left}
+#mUser[style*="block"]{display:flex!important}
+.ushow{position:relative;width:110px;height:104px;flex:none;background:linear-gradient(#232a6a,#1a2050);border:3px solid #0b0f2a;box-shadow:inset 0 -14px 0 #2e3780}
+.ushow canvas{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);width:104px;height:96px}
+.uinfo{flex:1;min-width:0}
+.urk{display:inline-block;font-size:14px;background:#ffcf4a;color:#0b0f2a;padding:2px 8px;border:3px solid #0b0f2a}
+.urk.none{background:#2e3780;color:#cfd3f0}
+.unm{font-size:20px;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.usc{margin-top:6px;font-size:13px;color:#a9b0e0}.usc b{font-family:'Press Start 2P',monospace;font-weight:400;font-size:19px;color:#ffcf4a;margin-right:3px}
+.usc.msg{font-size:13px;line-height:1.4}
+.utm{font-size:13px;color:#cfd3f0;margin-top:5px}
 .links{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
 .links a,.links button{font:inherit;font-size:15px;color:#fff;background:#141a44;border:3px solid #0b0f2a;box-shadow:inset -3px -3px 0 #0e1336,inset 3px 3px 0 #2e3780;padding:5px 10px;text-decoration:none;cursor:pointer}
 .note{font-size:13px;opacity:.8;line-height:1.5;margin-top:10px;text-shadow:1px 1px 0 #0b0f2a}
@@ -156,8 +164,13 @@ a.sec.rk{text-decoration:none;box-sizing:border-box}
       <div class="sm">헛디디면 유전자 가위가 싹둑!<br>에너지가 떨어지기 전에 계속 올라가세요<br>PC: ← 방향 전환 · → 오르기</div>
     </div>
     <div id="mUser" class="panel user" style="display:none">
-      <div class="unm" id="mName"></div>
-      <div class="ust">내 최고 <span class="px" id="mTop">0</span>쌍 · 랭킹 <span class="px" id="mBest">0</span>쌍</div>
+      <div class="ushow"><canvas id="mChar" width="104" height="96"></canvas></div>
+      <div class="uinfo">
+        <div class="urk" id="mRank">랭킹 미등록</div>
+        <div class="unm" id="mName"></div>
+        <div class="usc" id="mScore"></div>
+        <div class="utm" id="mTime"></div>
+      </div>
     </div>
     <button class="big" id="startBtn">시작하기</button>
     <div class="links">
@@ -632,16 +645,45 @@ async function register(){
   try{
     await saveDna(async()=>({best:g.score,bc:g.char,pt:g.pt,at:{'.sv':'timestamp'},run:g.run}));
     g.done=true;setReg();fanfare();
-    try{const all=await dbGet('/dna/players')||{};const rk=1+Object.values(all).filter(r=>r&&(r.best||0)>g.score).length;$('regMsg').textContent=`전교 ${rk}위에 올랐어요!`;}catch(e){}
+    try{const all=await dbGet('/dna/players')||{};const rk=1+Object.values(all).filter(r=>r&&(r.best||0)>g.score).length;myRank=rk;rankAt=Date.now();$('regMsg').textContent=`전교 ${rk}위에 올랐어요!`;}catch(e){}
     renderMain();
   }catch(e){await dnaChain;setReg();$('regMsg').textContent='등록하지 못했어요. 다시 눌러 주세요.';}
 }
 
+// ---- 메인 화면 내 기록 칸: 전교 순위 · 이름 · 랭킹 기록 · 플레이 타임 · 기록 세운 캐릭터 ----
+let myRank=null,rankAt=0;
+function fmtT(t){t=Math.round(t);return Math.floor(t/60)+':'+String(t%60).padStart(2,'0');}
+function profChar(){
+  if(!ME||!(ME.dna.best>0))return unlocked(charId)?charId:'poly';
+  const d=ME.dna;if(d.pt!=null)return d.bc||'poly';            // 새 기록: 플레이한 캐릭터 그대로
+  const top=Math.max(d.top||0,d.best||0),c=CHARS.find(x=>x.id===d.bc);   // 옛 기록: 지금 기준으로 잠겼으면 그 점수로 열리는 최고 캐릭터
+  if(c&&c.need<=top)return c.id;let r='poly';for(const x of CHARS)if(x.need<=top)r=x.id;return r;
+}
+async function loadRank(force){
+  if(!ME||!ONLINE)return;if(!force&&Date.now()-rankAt<20000)return;rankAt=Date.now();
+  try{const all=await dbGet('/dna/players')||{},b=ME.dna.best||0;myRank=b>0?1+Object.values(all).filter(r=>r&&(r.best||0)>b).length:null;drawProfile();}catch(e){}
+}
+function drawProfile(){
+  const R=$('mRank'),S=$('mScore'),T=$('mTime');
+  if(!ME){$('mName').textContent='미리보기';R.className='urk none';R.textContent='미리보기';S.className='usc';S.innerHTML=`<b>${localTop}</b>쌍`;T.textContent='';return;}
+  $('mName').textContent=ME.id+ME.rec.name;
+  const d=ME.dna;
+  if(d.best>0){R.className='urk';R.textContent=myRank?`전교 ${myRank}위`:'전교 -위';S.className='usc';S.innerHTML=`<b>${d.best}</b>쌍`;T.textContent=d.pt!=null?'⏱ '+fmtT(d.pt):'';}
+  else{R.className='urk none';R.textContent='랭킹 미등록';S.className='usc msg';S.textContent='한 판 하고 랭킹에 올라가 보세요!';T.textContent='';}
+}
+let profRaf=0,profLast=0;
+function profAnim(){
+  cancelAnimationFrame(profRaf);
+  const loop=now=>{profRaf=requestAnimationFrame(loop);
+    if(!$('menu').classList.contains('show')||$('mUser').style.display==='none'||now-profLast<80)return;profLast=now;
+    const id=profChar(),t=now/1000,cv=$('mChar');
+    if(SPR[id+'_idle0'])paintChar(cv,id,false,'_idle'+(Math.floor(t*6.25)%10));else paintChar(cv,id,false,'',1+.025*Math.sin(t*4));
+  };profRaf=requestAnimationFrame(loop);
+}
 function renderMain(){
   const logged=!!ME;
   $('mUser').style.display=(logged||!ONLINE)?'block':'none';
-  if(logged){$('mName').textContent=ME.id+ME.rec.name;$('mTop').textContent=ME.dna.top||0;$('mBest').textContent=ME.dna.best||0;}
-  else if(!ONLINE){$('mName').textContent='미리보기';$('mTop').textContent=localTop;$('mBest').textContent='-';}
+  if(logged||!ONLINE){drawProfile();if(logged)loadRank();}
   $('startBtn').textContent=ONLINE&&!logged?'로그인하고 시작':'시작하기';
   $('lnkRank').style.display=ONLINE?'':'none';$('lnkHub').style.display=ONLINE?'':'none';$('goPw').style.display=logged?'':'none';$('goGate').style.display=logged&&isGateAdmin()?'':'none';$('logout').style.display=logged?'':'none';
   const N=$('mNote');
@@ -726,7 +768,7 @@ $('goGate').onclick=openGate;$('gBack').onclick=()=>show('menu');$('gAllOff').on
 $('doLogin').onclick=doLogin;$('loginBack').onclick=()=>show('menu');
 $('goPw').onclick=()=>{$('pwErr').textContent='';show('pw');};$('doPw').onclick=doPw;$('pwBack').onclick=()=>show('menu');
 $('logout').onclick=()=>{ME=null;persist();charId=unlocked(charId)?charId:'poly';renderMain();toast('로그아웃했어요',1100);};
-renderMain();watchGate();autoLogin();
+renderMain();watchGate();autoLogin();profAnim();
 
 /* ---------- 캐릭터 선택 화면 ---------- */
 const LOCK='<svg class="lk" viewBox="0 0 10 11" shape-rendering="crispEdges"><path fill="#0b0f2a" d="M2 0h6v1h1v4h1v6H0V5h1V1h1z"/><path fill="#ffcf4a" d="M3 1h4v1h1v3H7V2H3v3H2V2h1zM1 5h8v5H1z"/><path fill="#c99a1c" d="M1 9h8v1H1z"/><path fill="#0b0f2a" d="M4 6h2v3H4z"/></svg>';
