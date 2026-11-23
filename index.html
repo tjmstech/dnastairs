@@ -107,6 +107,11 @@ a.sec.rk{text-decoration:none;box-sizing:border-box}
 .gb.on{background:#3ddc84;color:#0b0f2a;box-shadow:inset -3px -3px 0 #1f9e5a,inset 3px 3px 0 #a6f5c8}
 .gb:disabled{opacity:.5}
 .grow2{display:flex;gap:8px}.grow2 .sec{flex:1}
+#menu .card{position:relative;z-index:1}
+.shoot{position:absolute;right:-12%;width:90px;height:3px;z-index:0;pointer-events:none;background:linear-gradient(90deg,#fff 0 4px,rgba(255,255,255,.7) 4px,rgba(159,232,255,.35) 45%,rgba(159,232,255,0));transform:rotate(-24deg);transform-origin:left center;animation:shoot 1.1s ease-in forwards;opacity:0}
+.shoot.ltr{right:auto;left:-12%;transform:scaleX(-1) rotate(-24deg);transform-origin:right center;animation-name:shootR}
+@keyframes shoot{0%{opacity:0;translate:0 0}12%{opacity:1}100%{opacity:0;translate:-70vw 30vw}}
+@keyframes shootR{0%{opacity:0;translate:0 0}12%{opacity:1}100%{opacity:0;translate:70vw 30vw}}
 #toast{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);padding:10px 16px;background:#ffcf4a;color:#0b0f2a;border:4px solid #0b0f2a;box-shadow:0 5px 0 #0b0f2a;font-size:18px;text-align:center;line-height:1.4;max-width:84vw;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50}
 #toast.on{opacity:1}
 .ch.lock{background:#141a44;border-color:#0b0f2a;box-shadow:inset 0 0 0 3px #c99a1c;cursor:pointer}
@@ -389,7 +394,23 @@ function pauseGame(){
 }
 function resumeGame(){show(null);state='play';}
 function toMenu(){renderMain();$('pauseBtn').style.display='none';$('ctrl').style.display='none';$('count').style.display='none';show('menu');state='menu';resetSteps();idx=0;face=1;camX=0;camY=0;fall=null;cut=-1;anim={t:1,fx:0,fy:0};$('hud').style.display='none';}
-function openPick(){audio();buildPick();show('pick');}
+function openPick(){audio();buildPick();show('pick');pickAnim();}
+// 선택 화면: 열린 캐릭터는 게임에서처럼 숨 쉬어요 (초당 약 12번 다시 그려요)
+let pickRaf=0,pickLast=0;
+function pickAnim(){
+  cancelAnimationFrame(pickRaf);
+  const loop=now=>{
+    if(!$('pick').classList.contains('show'))return;
+    pickRaf=requestAnimationFrame(loop);
+    if(now-pickLast<80)return;pickLast=now;const t=now/1000;
+    document.querySelectorAll('#chars .ch:not(.lock) canvas').forEach((cv,k)=>{
+      const id=cv.dataset.id;if(!id)return;
+      if(SPR[id+'_idle0'])paintChar(cv,id,false,'_idle'+(Math.floor(t*6.25)%10));
+      else paintChar(cv,id,false,'',1+.025*Math.sin(t*4+k*.9));
+    });
+  };
+  pickRaf=requestAnimationFrame(loop);
+}
 
 /* ---------- 진행 ---------- */
 // 테스트 계정(00001만): 두 버튼 중 아무거나 눌러도 맞게 올라가요. 버튼 바깥을 누르면 끝나요. 에너지는 똑같이 줄어요.
@@ -398,9 +419,13 @@ function openPick(){audio();buildPick();show('pick');}
 const AUTO_IDS=['00000','00001'];let autoOn=false;try{autoOn=localStorage.getItem('dnaAuto')==='1';}catch(e){}
 function canAuto(){return !!ME&&AUTO_IDS.includes(ME.id);}
 function isTest(){return autoOn&&canAuto();}
+function shootStar(rtl){
+  const m=$('menu'),st=document.createElement('div');st.className='shoot'+(rtl?'':' ltr');
+  st.style.top=(8+Math.random()*14)+'%';m.insertBefore(st,m.firstChild);setTimeout(()=>st.remove(),1400);
+}
 function toggleAuto(){if(!canAuto())return;autoOn=!autoOn;try{localStorage.setItem('dnaAuto',autoOn?'1':'0');}catch(e){}renderMain();
-  // 안내창·소리 없이: 이름이 살짝 깜빡이고(켜면 두 번, 끄면 한 번) 휴대폰은 아주 짧게 진동해요
-  const n=$('mName');n.animate(autoOn?[{opacity:1},{opacity:.35},{opacity:1},{opacity:.35},{opacity:1}]:[{opacity:1},{opacity:.35},{opacity:1}],{duration:autoOn?420:240});try{navigator.vibrate&&navigator.vibrate(autoOn?[12,60,12]:12);}catch(e){}}
+  // 안내창·소리 없이: 메인 화면 뒤 하늘에 별똥별 하나 (켜면 오른쪽→왼쪽, 끄면 왼쪽→오른쪽)
+  shootStar(autoOn);}
 function act(turn,forceWrong){
   if(state!=='play')return;
   if(slowT>0)return;   // 늑대의 회피 중에는 입력을 받지 않아요 (연타가 이어져 바로 죽지 않게)
@@ -713,10 +738,10 @@ renderMain();watchGate();autoLogin();
 
 /* ---------- 캐릭터 선택 화면 ---------- */
 const LOCK='<svg class="lk" viewBox="0 0 10 11" shape-rendering="crispEdges"><path fill="#0b0f2a" d="M2 0h6v1h1v4h1v6H0V5h1V1h1z"/><path fill="#ffcf4a" d="M3 1h4v1h1v3H7V2H3v3H2V2h1zM1 5h8v5H1z"/><path fill="#c99a1c" d="M1 9h8v1H1z"/><path fill="#0b0f2a" d="M4 6h2v3H4z"/></svg>';
-function paintChar(cvs,id,lock){
+function paintChar(cvs,id,lock,fr,sy){
   const sp=SPR[id],su=sp.s||1,sw=Math.max(...sp.rows.map(r=>r.length))*su,sh=sp.rows.length*su;
   const W=cvs.width,H=cvs.height;TG=cvs.getContext('2d');TG.clearRect(0,0,W,H);TK=Math.min(2,(W-4)/sw,(H-4)/sh);
-  drawChar(id,W/2/TK,(H-2)/TK,1,false,false,0,true,1,1,0,'',lock?'#05071a':undefined);
+  drawChar(id,W/2/TK,(H-2)/TK,1,false,false,0,true,1,sy||1,0,fr||'',lock?'#05071a':undefined);
 
 }
 function buildPick(){
@@ -724,7 +749,7 @@ function buildPick(){
   for(const c of CHARS){
     const open=unlocked(c.id),isNew=open&&!seen.includes(c.id);
     const d=document.createElement('div');d.className='ch'+(c.skill||c.credit?' xtra':'')+(c.id===charId?' sel':'')+(open?'':' lock')+(isNew?' new':'');
-    const cvs=document.createElement('canvas');cvs.width=88;cvs.height=80;
+    const cvs=document.createElement('canvas');cvs.width=88;cvs.height=80;cvs.dataset.id=c.id;
     d.appendChild(cvs);
     if(open)d.insertAdjacentHTML('beforeend',`<div class="nm">${c.name}</div><div class="ds">${c.desc}</div>`);
     else d.insertAdjacentHTML('beforeend',`${LOCK}<div class="nm">${c.name}</div><div class="ds"><span class="need">${c.need}쌍</span> 달성하면<br>열려요</div>`);
