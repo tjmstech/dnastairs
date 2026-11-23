@@ -93,6 +93,14 @@ a.sec.rk{text-decoration:none;box-sizing:border-box}
 @keyframes skUsed{0%{transform:translate(-50%,9px) scale(1.25);background:#9fe8ff;opacity:1}25%{transform:translate(-50%,9px) scale(1.1)}100%{transform:translate(-50%,24px) scale(.9);opacity:0}}
 #dodgeTxt{position:fixed;left:0;top:0;transform:translate(-50%,-50%);font-size:30px;color:#9fe8ff;text-shadow:3px 0 0 #0b0f2a,-3px 0 0 #0b0f2a,0 3px 0 #0b0f2a,0 -3px 0 #0b0f2a,0 5px 0 #2a6f9a;pointer-events:none;opacity:0;white-space:nowrap;z-index:20}
 #flash{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,rgba(159,232,255,0) 40%,rgba(159,232,255,.55) 100%);z-index:15}
+#flash.lucky{background:radial-gradient(ellipse at center,rgba(255,207,74,0) 35%,rgba(255,207,74,.6) 100%)}
+#dodgeTxt.lucky{font-family:'Press Start 2P',monospace;font-size:24px;color:#ffcf4a;text-shadow:3px 0 0 #0b0f2a,-3px 0 0 #0b0f2a,0 3px 0 #0b0f2a,0 -3px 0 #0b0f2a,0 6px 0 #a8212f,0 0 18px rgba(255,207,74,.8)}
+#dodge.lucky{display:flex;border-color:#5a6aa0;box-shadow:0 0 0 3px #0b0f2a;animation:none}
+#dodge.lucky svg{filter:grayscale(.7) brightness(.8)}
+#dodge.lucky .dn{color:#8f98c8;text-shadow:none}
+#dodge.lucky .rd{background:#5a6aa0;color:#dfe4f2}
+#dodge.lucky.pop{animation:skLucky .6s}
+@keyframes skLucky{0%{transform:translate(-50%,9px) scale(1.3);border-color:#ffcf4a;box-shadow:0 0 0 3px #0b0f2a,0 0 18px rgba(255,207,74,.9)}100%{transform:translate(-50%,9px) scale(1)}}
 .glist{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px;max-height:52vh;overflow-y:auto;padding:2px}
 .gb{font:inherit;font-size:16px;padding:8px 2px 6px;border:3px solid #0b0f2a;cursor:pointer;color:#cfd3f0;background:#2a2f5a;box-shadow:inset -3px -3px 0 #1b2050,inset 3px 3px 0 #3d447a;line-height:1.15}
 .gb small{display:block;font-size:11px;opacity:.85}
@@ -346,7 +354,7 @@ function genTo(n){
 /* ---------- 상태 ---------- */
 let state='menu',idx=0,face=1,score=0,energy=1,started=false;
 let trail=[];const TRAIL_LIFE=.3;
-let playT=0,dodgeLeft=0,dodgeFx=null,slowT=0,anim={t:1,fx:0,fy:0},landT=0,turnT=0,turnDir=1,idleT=0,fall=null,cut=-1,camX=0,camY=0,clock=0,sparks=[],bannerT=0;
+const LUCKY_P=.1;let skT=0,playT=0,dodgeLeft=0,dodgeFx=null,slowT=0,anim={t:1,fx:0,fy:0},landT=0,turnT=0,turnDir=1,idleT=0,fall=null,cut=-1,camX=0,camY=0,clock=0,sparks=[],bannerT=0;
 // 에너지: 한 칸 오를 때마다 GAIN만큼 차고, 높이 갈수록 빨리 닳아요.
 // 1200칸 이상에서는 가득 찬 상태로도 약 1.2초 만에 바닥나요(초당 7번 이상 눌러야 버팀).
 const GAIN=.11;
@@ -368,7 +376,7 @@ function startGame(){
   if(ONLINE&&ME&&clsOf(ME.id)!=='000'&&GATE[clsOf(ME.id)]===false){onGate();return;}
   if(!unlocked(charId))charId='poly';
   startRun();
-  playT=0;dodgeLeft=charId==='snuwolf'?1:0;dodgeFx=null;slowT=0;$('dodge').className=dodgeLeft?'on':'';$('dodgeTxt').style.opacity=0;
+  playT=0;dodgeLeft=charId==='snuwolf'?1:0;dodgeFx=null;slowT=0;clearTimeout(skT);$('dodge').className=dodgeLeft?'on':'';$('dodge').querySelector('.rd').textContent='READY';$('dodgeTxt').style.opacity=0;
   trail=[];walkPh=walkTg=0;audio();resetSteps();idx=0;face=1;score=0;energy=1;started=false;fall=null;cut=-1;sparks=[];anim={t:1,fx:0,fy:0};
   camX=0;camY=0;show(null);
   $('hud').style.display='block';$('ctrl').style.display='flex';$('pauseBtn').style.display='block';$('zone').textContent='STAGE 1 · '+ZONES[0].name;updHud();
@@ -399,15 +407,20 @@ function act(turn){
   if(turn){face=-face;turnT=.18;turnDir=face;tailSwish=.75;swPh=0;}
   genTo(idx+40);idleT=0;
   const fx=X[idx],fy=idx;
-  // 스널피 특전: 한 판에 한 번, 잘못 눌러도 가위를 피해서 맞는 계단으로 올라가요 (짧은 슬로모션, 그동안 입력 안 받음)
-  if(X[idx+1]-X[idx]!==face&&dodgeLeft>0){
+  // 스널피 특전 '늑대의 회피': 첫 실수는 100% 피하고, 그 뒤 실수는 10% 확률로 피해요 (LUCKY). 피하면 맞는 계단으로 올라가요.
+  const wrongNow=X[idx+1]-X[idx]!==face;
+  const lucky=wrongNow&&dodgeLeft===0&&charId==='snuwolf'&&Math.random()<LUCKY_P;
+  if(wrongNow&&(dodgeLeft>0||lucky)){
     dodgeLeft=0;const wrong=face;
     if(face!==X[idx+1]-X[idx]){face=X[idx+1]-X[idx];turnT=.18;turnDir=face;}
-    dodgeFx={t:0,i:idx,dir:wrong,snap:false};slowT=.6;
-    $('dodge').className='used';
-    const fl=$('flash');fl.style.transition='none';fl.style.opacity=1;requestAnimationFrame(()=>{fl.style.transition='opacity .45s';fl.style.opacity=0;});
-    beep(420,.16,'triangle',.05,1500);
-    for(let k=0;k<3;k++)trail.push({x:fx-wrong*.35*(k+1),y:fy,f:wrong,t:-.04*k,col:'#9fe8ff',fr:k%2?'_a':'_b'});
+    dodgeFx={t:0,i:idx,dir:wrong,snap:false,lucky};slowT=.6;
+    const D=$('dodge');D.className=lucky?'lucky pop':'used';
+    clearTimeout(skT);skT=setTimeout(()=>{if(charId==='snuwolf'&&dodgeLeft===0){D.className='lucky';D.querySelector('.rd').textContent=Math.round(LUCKY_P*100)+'%';}},lucky?600:720);
+    const T=$('dodgeTxt');T.textContent=lucky?'LUCKY!':'회피!';T.className=lucky?'lucky':'';
+    const fl=$('flash');fl.className=lucky?'lucky':'';fl.style.transition='none';fl.style.opacity=1;requestAnimationFrame(()=>{fl.style.transition='opacity .45s';fl.style.opacity=0;});
+    if(lucky){beep(660,.1,'square',.045);setTimeout(()=>beep(990,.1,'square',.045),90);setTimeout(()=>beep(1320,.18,'square',.045),180);}
+    else beep(420,.16,'triangle',.05,1500);
+    for(let k=0;k<3;k++)trail.push({x:fx-wrong*.35*(k+1),y:fy,f:wrong,t:-.04*k,col:lucky?'#ffcf4a':'#9fe8ff',fr:k%2?'_a':'_b'});
   }
   if(X[idx+1]-X[idx]===face){
     idx++;score++;started=true;energy=Math.min(1,energy+GAIN);
