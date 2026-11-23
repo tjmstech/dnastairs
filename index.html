@@ -107,7 +107,6 @@ a.sec.rk{text-decoration:none;box-sizing:border-box}
 .gb.on{background:#3ddc84;color:#0b0f2a;box-shadow:inset -3px -3px 0 #1f9e5a,inset 3px 3px 0 #a6f5c8}
 .gb:disabled{opacity:.5}
 .grow2{display:flex;gap:8px}.grow2 .sec{flex:1}
-.adot{display:inline-block;width:6px;height:6px;background:#3ddc84;margin-left:6px;vertical-align:middle;opacity:.8}
 #toast{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);padding:10px 16px;background:#ffcf4a;color:#0b0f2a;border:4px solid #0b0f2a;box-shadow:0 5px 0 #0b0f2a;font-size:18px;text-align:center;line-height:1.4;max-width:84vw;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50}
 #toast.on{opacity:1}
 .ch.lock{background:#141a44;border-color:#0b0f2a;box-shadow:inset 0 0 0 3px #c99a1c;cursor:pointer}
@@ -394,16 +393,19 @@ function openPick(){audio();buildPick();show('pick');}
 
 /* ---------- 진행 ---------- */
 // 테스트 계정(00001만): 두 버튼 중 아무거나 눌러도 맞게 올라가요. 버튼 바깥을 누르면 끝나요. 에너지는 똑같이 줄어요.
-// 오토 스텝: 00000·00001 계정 전용 숨은 스위치 (첫 화면의 내 이름을 1초 꾹 누르면 켜고 꺼져요)
-// 켜면 두 버튼 중 아무거나 눌러도 맞게 올라가요(에너지는 그대로 줄어요). PC는 ↓ 키, 휴대폰은 버튼 바깥 터치 = 잘못 누른 걸로 처리해요.
+// 오토 스텝: 00000·00001 계정 전용 숨은 스위치 (첫 화면의 내 이름을 1초 꾹 누르면 켜고 꺼져요. 켜면 이름이 두 번, 끄면 한 번 깜빡여요)
+// 켜면 두 버튼 중 아무거나 눌러도 맞게 올라가요(에너지는 그대로 줄어요). PC는 ↓ 키, 휴대폰은 버튼 바깥 터치 = 잘못 누른 판정(회피 스킬도 적용).
 const AUTO_IDS=['00000','00001'];let autoOn=false;try{autoOn=localStorage.getItem('dnaAuto')==='1';}catch(e){}
 function canAuto(){return !!ME&&AUTO_IDS.includes(ME.id);}
 function isTest(){return autoOn&&canAuto();}
-function toggleAuto(){if(!canAuto())return;autoOn=!autoOn;try{localStorage.setItem('dnaAuto',autoOn?'1':'0');}catch(e){}renderMain();toast(autoOn?'오토 스텝 ON':'오토 스텝 OFF',1100);beep(autoOn?880:330,.08,'square',.04);}
-function act(turn){
+function toggleAuto(){if(!canAuto())return;autoOn=!autoOn;try{localStorage.setItem('dnaAuto',autoOn?'1':'0');}catch(e){}renderMain();
+  // 안내창·소리 없이: 이름이 살짝 깜빡이고(켜면 두 번, 끄면 한 번) 휴대폰은 아주 짧게 진동해요
+  const n=$('mName');n.animate(autoOn?[{opacity:1},{opacity:.35},{opacity:1},{opacity:.35},{opacity:1}]:[{opacity:1},{opacity:.35},{opacity:1}],{duration:autoOn?420:240});try{navigator.vibrate&&navigator.vibrate(autoOn?[12,60,12]:12);}catch(e){}}
+function act(turn,forceWrong){
   if(state!=='play')return;
   if(slowT>0)return;   // 늑대의 회피 중에는 입력을 받지 않아요 (연타가 이어져 바로 죽지 않게)
-  if(isTest()){genTo(idx+2);turn=X[idx+1]-X[idx]!==face;}
+  if(forceWrong){genTo(idx+2);turn=X[idx+1]-X[idx]===face;}   // 오토 스텝: ↓ 키·버튼 바깥 터치 = 일부러 잘못 누른 것 (늑대의 회피도 그대로 작동)
+  else if(isTest()){genTo(idx+2);turn=X[idx+1]-X[idx]!==face;}
   if(turn){face=-face;turnT=.18;turnDir=face;tailSwish=.75;swPh=0;}
   genTo(idx+40);idleT=0;
   const fx=X[idx],fy=idx;
@@ -483,12 +485,12 @@ function bindBtn(el,fn){
   el.addEventListener('pointerup',off);el.addEventListener('pointerleave',off);el.addEventListener('pointercancel',off);
 }
 bindBtn($('turnBtn'),()=>act(true));
-addEventListener('pointerdown',e=>{if(state!=='play'||!isTest())return;if(e.target.closest('#ctrl,#pauseBtn'))return;e.preventDefault();die('miss');});bindBtn($('upBtn'),()=>act(false));
+addEventListener('pointerdown',e=>{if(state!=='play'||!isTest())return;if(e.target.closest('#ctrl,#pauseBtn'))return;e.preventDefault();act(false,true);});bindBtn($('upBtn'),()=>act(false));
 addEventListener('keydown',e=>{
   if(e.repeat)return;
   if((e.key==='Escape'||e.key==='p')&&(state==='play'||state==='count')){pauseGame();return;}
   if(state==='play'){
-    if(e.key==='ArrowDown'&&isTest()){e.preventDefault();if(state==='play')die('miss');}
+    if(e.key==='ArrowDown'&&isTest()){e.preventDefault();act(false,true);}
     else if(e.key==='ArrowLeft'||e.key==='a'||e.key==='z'){e.preventDefault();act(true);}
     else if(e.key==='ArrowRight'||e.key==='ArrowUp'||e.key==='d'||e.key==='x'||e.key===' '){e.preventDefault();act(false);}
   }else if(e.key==='Enter'){
@@ -621,7 +623,7 @@ async function register(){
 function renderMain(){
   const logged=!!ME;
   $('mUser').style.display=(logged||!ONLINE)?'block':'none';
-  if(logged){$('mName').textContent=ME.id+ME.rec.name;if(isTest())$('mName').insertAdjacentHTML('beforeend','<span class="adot"></span>');$('mTop').textContent=ME.dna.top||0;$('mBest').textContent=ME.dna.best||0;}
+  if(logged){$('mName').textContent=ME.id+ME.rec.name;$('mTop').textContent=ME.dna.top||0;$('mBest').textContent=ME.dna.best||0;}
   else if(!ONLINE){$('mName').textContent='미리보기';$('mTop').textContent=localTop;$('mBest').textContent='-';}
   $('startBtn').textContent=ONLINE&&!logged?'로그인하고 시작':'시작하기';
   $('lnkRank').style.display=ONLINE?'':'none';$('lnkHub').style.display=ONLINE?'':'none';$('goPw').style.display=logged?'':'none';$('goGate').style.display=logged&&isGateAdmin()?'':'none';$('logout').style.display=logged?'':'none';
