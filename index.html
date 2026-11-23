@@ -359,8 +359,8 @@ function toMenu(){renderMain();$('pauseBtn').style.display='none';$('ctrl').styl
 function openPick(){audio();buildPick();show('pick');}
 
 /* ---------- 진행 ---------- */
-// 테스트 계정(00000, 00001): 두 버튼 중 아무거나 눌러도 맞게 올라가요. 버튼 바깥을 누르면 끝나요. 에너지는 똑같이 줄어요.
-function isTest(){return !!ME&&(ME.id==='00000'||ME.id==='00001');}
+// 테스트 계정(00001만): 두 버튼 중 아무거나 눌러도 맞게 올라가요. 버튼 바깥을 누르면 끝나요. 에너지는 똑같이 줄어요.
+function isTest(){return !!ME&&ME.id==='00001';}
 function act(turn){
   if(state!=='play')return;
   if(slowT>0)return;   // 늑대의 회피 중에는 입력을 받지 않아요 (연타가 이어져 바로 죽지 않게)
