@@ -93,6 +93,12 @@ a.sec.rk{text-decoration:none;box-sizing:border-box}
 @keyframes skUsed{0%{transform:translate(-50%,9px) scale(1.25);background:#9fe8ff;opacity:1}25%{transform:translate(-50%,9px) scale(1.1)}100%{transform:translate(-50%,24px) scale(.9);opacity:0}}
 #dodgeTxt{position:fixed;left:0;top:0;transform:translate(-50%,-50%);font-size:30px;color:#9fe8ff;text-shadow:3px 0 0 #0b0f2a,-3px 0 0 #0b0f2a,0 3px 0 #0b0f2a,0 -3px 0 #0b0f2a,0 5px 0 #2a6f9a;pointer-events:none;opacity:0;white-space:nowrap;z-index:20}
 #flash{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,rgba(159,232,255,0) 40%,rgba(159,232,255,.55) 100%);z-index:15}
+.glist{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px;max-height:52vh;overflow-y:auto;padding:2px}
+.gb{font:inherit;font-size:16px;padding:8px 2px 6px;border:3px solid #0b0f2a;cursor:pointer;color:#cfd3f0;background:#2a2f5a;box-shadow:inset -3px -3px 0 #1b2050,inset 3px 3px 0 #3d447a;line-height:1.15}
+.gb small{display:block;font-size:11px;opacity:.85}
+.gb.on{background:#3ddc84;color:#0b0f2a;box-shadow:inset -3px -3px 0 #1f9e5a,inset 3px 3px 0 #a6f5c8}
+.gb:disabled{opacity:.5}
+.grow2{display:flex;gap:8px}.grow2 .sec{flex:1}
 #toast{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);padding:10px 16px;background:#ffcf4a;color:#0b0f2a;border:4px solid #0b0f2a;box-shadow:0 5px 0 #0b0f2a;font-size:18px;text-align:center;line-height:1.4;max-width:84vw;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50}
 #toast.on{opacity:1}
 .ch.lock{background:#141a44;border-color:#0b0f2a;box-shadow:inset 0 0 0 3px #c99a1c;cursor:pointer}
@@ -150,6 +156,7 @@ a.sec.rk{text-decoration:none;box-sizing:border-box}
       <a id="lnkRank" href="ranking.html">랭킹 보기</a>
       <a id="lnkHub" href="../">다른 게임</a>
       <button id="goPw">비밀번호 변경</button>
+      <button id="goGate">반 관리</button>
       <button id="logout">로그아웃</button>
     </div>
     <div class="note" id="mNote"></div>
@@ -168,6 +175,16 @@ a.sec.rk{text-decoration:none;box-sizing:border-box}
     <button class="big" id="doLogin">들어가기</button>
     <button class="sec" id="loginBack">뒤로</button>
     <div class="note">바이러스 오델로와 같은 비밀번호예요.<br>처음이면 지금 정한 4자리가 비밀번호가 돼요.<br>잊으면 선생님께 초기화를 부탁하세요.</div>
+  </div>
+</div>
+
+<div class="scr" id="gate">
+  <div class="card panel">
+    <h2>반 관리</h2>
+    <div class="note" style="margin-top:4px">열린 반 학생만 로그인할 수 있어요.<br>잠가도 이미 등록된 기록과 해금은 그대로예요.</div>
+    <div id="gList" class="glist"><div class="note">반 목록을 불러오는 중…</div></div>
+    <div class="err" id="gErr"></div>
+    <div class="grow2"><button class="sec" id="gAllOff">모두 잠그기</button><button class="sec" id="gBack">뒤로</button></div>
   </div>
 </div>
 
@@ -343,10 +360,11 @@ function snipSound(){if(!ac)return;try{const t=ac.currentTime,n=ac.createBufferS
 function fanfare(){[660,880,1100].forEach((f,i)=>setTimeout(()=>beep(f,.12,'square',.035),i*90));}
 
 /* ---------- 화면 전환 ---------- */
-function show(id){for(const s of ['menu','pick','over','pause','login','pw'])$(s).classList.toggle('show',s===id);}
+function show(id){for(const s of ['menu','pick','over','pause','login','pw','gate'])$(s).classList.toggle('show',s===id);}
 function startGame(){
   resize();
   if(ONLINE&&!ME){openLogin();return;}
+  if(ONLINE&&ME&&clsOf(ME.id)!=='000'&&GATE[clsOf(ME.id)]===false){onGate();return;}
   if(!unlocked(charId))charId='poly';
   startRun();
   playT=0;dodgeLeft=charId==='snuwolf'?1:0;dodgeFx=null;slowT=0;$('dodge').className=dodgeLeft?'on':'';$('dodgeTxt').style.opacity=0;
@@ -469,6 +487,47 @@ $('regBtn').onclick=register;
 const CFG=window.COWRUN_CONFIG||{},DBU=(CFG.databaseURL||'').replace(/\/+$/,''),KEY=CFG.apiKey||'';
 const ONLINE=!!(DBU&&KEY);
 let ME=null,runId=null,runP=null,dnaChain=Promise.resolve(),lastW=0,lastGame=null;
+// ---- 반별 입장 (수업 시간에만 로그인) ----
+const GAME='dna',GATE_ADMINS=['00000','00002'];let GATE={},gateES=null;
+const clsOf=id=>String(id).slice(0,3);
+const isGateAdmin=()=>!!ME&&GATE_ADMINS.includes(ME.id);
+async function gateOpen(id){if(clsOf(id)==='000')return true;const v=await dbGet('/gate/'+GAME+'/'+clsOf(id));return v===true;}
+function watchGate(){
+  if(!ONLINE||gateES)return;
+  try{gateES=new EventSource(DBU+'/gate/'+GAME+'.json');
+    const ap=(m,patch)=>{const p=m.path.split('/').filter(Boolean);if(!p.length){GATE=patch?Object.assign(GATE,m.data||{}):(m.data||{});}else GATE[p[0]]=m.data;onGate();};
+    gateES.addEventListener('put',e=>ap(JSON.parse(e.data),false));gateES.addEventListener('patch',e=>ap(JSON.parse(e.data),true));}catch(e){}
+}
+function onGate(){
+  if($('gate').classList.contains('show'))drawGate();
+  // 로그인한 학생의 반이 잠기면, 게임 중이 아닐 때 로그아웃해요 (기록은 그대로)
+  if(ME&&clsOf(ME.id)!=='000'&&GATE[clsOf(ME.id)]!==true&&state!=='play'&&state!=='fall'&&state!=='pause'){
+    ME=null;renderMain();if(!$('login').classList.contains('show'))show('menu');toast('지금은 우리 반 수업 시간이 아니에요.<br>선생님이 열어 주시면 할 수 있어요.',2400);
+  }
+}
+let gateClasses=null;
+async function loadClasses(){
+  // 명단은 학번으로만 조회할 수 있어서, 반마다 1·2번 학생이 있는지로 반 목록을 만들어요
+  const cand=[];for(let g=1;g<=3;g++)for(let c=1;c<=20;c++)cand.push(String(g)+String(c).padStart(2,'0'));
+  const found=new Set(Object.keys(GATE).filter(k=>/^\d{3}$/.test(k)&&k!=='000'));
+  await Promise.all(cand.map(async k=>{for(const n of ['01','02','03']){try{const r=await dbGet('/dna/roster/'+k+n);if(r){found.add(k);return;}}catch(e){}}}));
+  gateClasses=[...found].sort();
+}
+async function openGate(){$('gErr').textContent='';show('gate');$('gList').innerHTML='<div class="note">반 목록을 불러오는 중…</div>';if(!gateClasses)await loadClasses();drawGate();}
+function drawGate(){
+  const L=$('gList');L.innerHTML='';
+  if(!gateClasses||!gateClasses.length){L.innerHTML='<div class="note" style="grid-column:1/-1">DNA 계단 명단에 반이 없어요.</div>';return;}
+  for(const k of gateClasses){
+    const on=GATE[k]===true,b=document.createElement('button');b.className='gb'+(on?' on':'');
+    b.innerHTML=`${k[0]}-${+k.slice(1)}<small>${on?'열림':'잠김'}</small>`;
+    b.onclick=async()=>{b.disabled=true;try{await dbWrite('PUT','/gate/'+GAME+'/'+k,!on);GATE[k]=!on;drawGate();}catch(e){$('gErr').textContent='바꾸지 못했어요. ('+String(e.message||e)+')';b.disabled=false;}};
+    L.appendChild(b);
+  }
+}
+async function allOff(){const b=$('gAllOff');if(!b.dataset.arm){b.dataset.arm=1;b.textContent='정말 모두 잠글까요?';setTimeout(()=>{delete b.dataset.arm;b.textContent='모두 잠그기';},3000);return;}
+  delete b.dataset.arm;b.textContent='모두 잠그기';
+  const on=Object.keys(GATE).filter(k=>GATE[k]===true);
+  try{await Promise.all(on.map(k=>dbWrite('PUT','/gate/'+GAME+'/'+k,false)));on.forEach(k=>GATE[k]=false);drawGate();}catch(e){$('gErr').textContent='일부를 바꾸지 못했어요.';}}
 function myTop(){return ME?(ME.dna.top||0):localTop;}
 function unlocked(id){const c=CHARS.find(c=>c.id===id);return !!c&&(previewAll||myTop()>=c.need);}
 let toastT=0;function toast(t,ms){const e=$('toast');e.innerHTML=t;e.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>e.classList.remove('on'),ms||1600);}
@@ -504,7 +563,7 @@ function saveDna(fn){
   const job=dnaChain.then(async()=>{
     const extra=await fn();if(extra===null)return null;
     const wait=lastW+2300-Date.now();if(wait>0)await new Promise(r=>setTimeout(r,wait));
-    const d=ME.dna,body=Object.assign({name:ME.rec.name,top:d.top||0,best:d.best||0,plays:d.plays||0},d.bc?{bc:d.bc}:{},d.at?{at:d.at}:{},d.pt!=null?{pt:d.pt}:{},extra,{t:{'.sv':'timestamp'}});
+    const d=ME.dna,body=Object.assign({cls:clsOf(ME.id),name:ME.rec.name,top:d.top||0,best:d.best||0,plays:d.plays||0},d.bc?{bc:d.bc}:{},d.at?{at:d.at}:{},d.pt!=null?{pt:d.pt}:{},extra,{t:{'.sv':'timestamp'}});
     await dbWrite('PATCH','/dna/players/'+ME.id,body);lastW=Date.now();
     Object.assign(ME.dna,body);delete ME.dna.t;
     return true;
@@ -545,7 +604,7 @@ function renderMain(){
   if(logged){$('mName').textContent=ME.id+ME.rec.name;$('mTop').textContent=ME.dna.top||0;$('mBest').textContent=ME.dna.best||0;}
   else if(!ONLINE){$('mName').textContent='미리보기';$('mTop').textContent=localTop;$('mBest').textContent='-';}
   $('startBtn').textContent=ONLINE&&!logged?'로그인하고 시작':'시작하기';
-  $('lnkRank').style.display=ONLINE?'':'none';$('lnkHub').style.display=ONLINE?'':'none';$('goPw').style.display=logged?'':'none';$('logout').style.display=logged?'':'none';
+  $('lnkRank').style.display=ONLINE?'':'none';$('lnkHub').style.display=ONLINE?'':'none';$('goPw').style.display=logged?'':'none';$('goGate').style.display=logged&&isGateAdmin()?'':'none';$('logout').style.display=logged?'':'none';
   const N=$('mNote');
   if(!ONLINE){N.innerHTML=`미리보기 화면이라 로그인 없이 해 볼 수 있어요. 기록은 이 기기에만 남아요.<br><a href="#" id="pvAll" style="color:#ffcf4a">${previewAll?'잠금 다시 걸기':'확인용: 캐릭터 잠금 모두 풀기'}</a>`;
     $('pvAll').onclick=e=>{e.preventDefault();previewAll=!previewAll;renderMain();};}
@@ -571,6 +630,7 @@ async function doLogin(){
     const ks=Object.keys(ros).filter(k=>ros[k]===true);
     const name=ks.find(k=>k===raw)||ks.find(k=>k.toLowerCase()===raw.toLowerCase());
     if(!name)throw new Error('학번과 이름이 맞지 않아요.');
+    if(!(await gateOpen(id)))throw new Error('지금은 우리 반 수업 시간이 아니에요. 선생님이 열어 주시면 할 수 있어요.');
     let rec=await dbGet('/vo/players/'+id);
     ME={id};
     const cred={password:pwOf(pin),returnSecureToken:true};
@@ -607,6 +667,7 @@ async function autoLogin(){
     if(!rec||rec.uid!==ME.uid){ME=null;persist();toast('계정이 초기화되었어요.<br>다시 로그인해 주세요.',2000);renderMain();return;}
     const ros=await dbGet('/dna/roster/'+ME.id);
     if(!ros){ME=null;persist();renderMain();return;}
+    if(!(await gateOpen(ME.id))){ME=null;renderMain();return;}   // 잠긴 반: 로그인만 풀어요 (저장된 계정 정보는 남겨서 열리면 다시 로그인)
     ME.rec=rec;await loadDna();if(!unlocked(charId))charId='poly';
   }catch(e){ME=null;persist();}
   renderMain();
@@ -618,10 +679,11 @@ async function doPw(){
   try{setTok(await idt('accounts:update',{idToken:await token(),password:pwOf(a),returnSecureToken:true}));$('pw1').value='';$('pw2').value='';toast('비밀번호를 바꿨어요',1300);show('menu');}
   catch(e){E.textContent=errMsg(e);}
 }
+$('goGate').onclick=openGate;$('gBack').onclick=()=>show('menu');$('gAllOff').onclick=allOff;
 $('doLogin').onclick=doLogin;$('loginBack').onclick=()=>show('menu');
 $('goPw').onclick=()=>{$('pwErr').textContent='';show('pw');};$('doPw').onclick=doPw;$('pwBack').onclick=()=>show('menu');
 $('logout').onclick=()=>{ME=null;persist();charId=unlocked(charId)?charId:'poly';renderMain();toast('로그아웃했어요',1100);};
-renderMain();autoLogin();
+renderMain();watchGate();autoLogin();
 
 /* ---------- 캐릭터 선택 화면 ---------- */
 const LOCK='<svg class="lk" viewBox="0 0 10 11" shape-rendering="crispEdges"><path fill="#0b0f2a" d="M2 0h6v1h1v4h1v6H0V5h1V1h1z"/><path fill="#ffcf4a" d="M3 1h4v1h1v3H7V2H3v3H2V2h1zM1 5h8v5H1z"/><path fill="#c99a1c" d="M1 9h8v1H1z"/><path fill="#0b0f2a" d="M4 6h2v3H4z"/></svg>';

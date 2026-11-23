@@ -96,6 +96,12 @@ select.tab{appearance:none;-webkit-appearance:none}
       </div>
       <button class="b gray" id="logoutBtn" style="margin-top:8px">관리자 모드 끄기</button>
       <div class="err" id="admErr"></div>
+      <details class="roster" id="gateBox">
+        <summary>반 입장 관리 (수업 시간에만 로그인)</summary>
+        <div class="rnote">열린 반 학생만 DNA 계단에 로그인할 수 있어요. 잠가도 이미 등록된 기록과 해금은 그대로예요. 게임에서 00000·00002 테스트 계정으로 로그인해도 같은 걸 바꿀 수 있어요.</div>
+        <div class="rrow" id="gateList">펼치면 반 목록을 불러와요…</div>
+        <div class="rmsg" id="gateMsg"></div>
+      </details>
       <details class="roster">
         <summary>DNA 계단 명단 관리</summary>
         <div class="rnote">이 명단은 <b>DNA 계단 전용</b>이에요. 여기에 올린 학번 + 이름으로만 DNA 계단에 로그인할 수 있어요. 카우런·오델로 명단은 바뀌지 않아요.<br>명단을 올리기 전에는 학생이 들어올 수 없어요. 미리 테스트하려면 아래 '학번 조회·수정'으로 00000 / test만 먼저 넣으세요.</div>
@@ -241,6 +247,23 @@ $('loginBtn').onclick=async()=>{
 $('pw').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginBtn').click();});
 $('logoutBtn').onclick=()=>{token=null;admin=false;$('adminBar').style.display='none';$('admBtn').style.display='inline-flex';document.body.classList.remove('admin');render();};
 connect();
+
+/* ---- 반 입장 관리 (관리자) ---- */
+(function(){
+  let G={},classes=null;
+  const draw=()=>{const L=$('gateList');L.innerHTML='';
+    if(!classes.length){L.textContent='DNA 계단 명단에 반이 없어요.';return;}
+    for(const k of classes){const on=G[k]===true,b=document.createElement('button');b.className='b'+(on?'':' gray');b.textContent=`${k[0]}-${+k.slice(1)} ${on?'열림':'잠김'}`;
+      b.onclick=async()=>{b.disabled=true;try{const r=await fetch(DB+'/gate/dna/'+k+'.json?auth='+encodeURIComponent(token),{method:'PUT',body:JSON.stringify(!on)});if(!r.ok)throw new Error(r.status);G[k]=!on;$('gateMsg').textContent='';}catch(e){$('gateMsg').textContent='바꾸지 못했어요 ('+e.message+')';}draw();};
+      L.appendChild(b);}};
+  $('gateBox').addEventListener('toggle',async()=>{
+    if(!$('gateBox').open)return;
+    try{G=await (await fetch(DB+'/gate/dna.json')).json()||{};}catch(e){G={};}
+    if(!classes){const found=new Set(Object.keys(G).filter(k=>/^\d{3}$/.test(k)&&k!=='000'));const cand=[];for(let g=1;g<=3;g++)for(let c=1;c<=20;c++)cand.push(String(g)+String(c).padStart(2,'0'));
+      await Promise.all(cand.map(async k=>{for(const n of ['01','02','03']){try{const r=await (await fetch(DB+'/dna/roster/'+k+n+'.json')).json();if(r){found.add(k);return;}}catch(e){}}}));classes=[...found].sort();}
+    draw();
+  });
+})();
 
 /* ---- 학생 명단 관리 (관리자) ---- */
 (function(){
