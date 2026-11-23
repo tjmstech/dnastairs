@@ -293,19 +293,19 @@ const OLD=['#a08cff','#5b4bb8'],NEW=['#ffa25c','#a8521c'];
 // need: 한 판에 이만큼 이어 붙이면 열려요 (내 최고 기록 기준). 나중에 숫자만 바꾸면 돼요.
 const CHARS=[
   {id:'poly',name:'중합효소',desc:'DNA를 이어 붙이는 일꾼 효소',need:0},
-  {id:'frog',name:'개구리',desc:'세계 최초의 체세포 복제 동물',need:100},
-  {id:'sci',name:'과학자',desc:'DNA의 비밀을 파헤치는 과학자',need:200},
-  {id:'snuppy',name:'스너피',desc:'세계 최초의 복제 개',need:400},
-  {id:'dolly',name:'돌리',desc:'세계 최초의 체세포 복제 포유류',need:600},
-  {id:'snuwolf',name:'스널피',desc:'세계 최초의 복제 늑대',need:1000,skill:'늑대의 회피',credit:'Designed by Mocha'}
+  {id:'frog',name:'개구리',desc:'세계 최초의 체세포 복제 동물',need:200},
+  {id:'sci',name:'과학자',desc:'DNA의 비밀을 파헤치는 과학자',need:400},
+  {id:'snuppy',name:'스너피',desc:'세계 최초의 복제 개',need:800},
+  {id:'dolly',name:'돌리',desc:'세계 최초의 체세포 복제 포유류',need:1200},
+  {id:'snuwolf',name:'스널피',desc:'세계 최초의 복제 늑대',need:2000,skill:'늑대의 회피',credit:'Designed by Mocha'}
 ];
 const ZONES=[
   {at:0,name:'세포핵 속',draw:bgNucleus},
-  {at:100,name:'세포 속',draw:bgCell},
-  {at:200,name:'혈관 속',draw:bgBlood},
-  {at:400,name:'실험실',draw:bgLab},
-  {at:600,name:'하늘',draw:bgSky},
-  {at:1000,name:'우주',draw:bgSpace}
+  {at:200,name:'세포 속',draw:bgCell},
+  {at:400,name:'혈관 속',draw:bgBlood},
+  {at:800,name:'실험실',draw:bgLab},
+  {at:1200,name:'하늘',draw:bgSky},
+  {at:2000,name:'우주',draw:bgSpace}
 ];
 let charId='poly',localTop=0,previewAll=false,seen=['poly'];
 try{localTop=+localStorage.getItem('dnaBest')||0;charId=localStorage.getItem('dnaChar')||'poly';seen=JSON.parse(localStorage.getItem('dnaSeen')||'["poly"]');}catch(e){}
@@ -328,7 +328,7 @@ function genTo(n){
 /* ---------- 상태 ---------- */
 let state='menu',idx=0,face=1,score=0,energy=1,started=false;
 let trail=[];const TRAIL_LIFE=.3;
-let dodgeLeft=0,dodgeFx=null,slowT=0,anim={t:1,fx:0,fy:0},landT=0,turnT=0,turnDir=1,idleT=0,fall=null,cut=-1,camX=0,camY=0,clock=0,sparks=[],bannerT=0;
+let playT=0,dodgeLeft=0,dodgeFx=null,slowT=0,anim={t:1,fx:0,fy:0},landT=0,turnT=0,turnDir=1,idleT=0,fall=null,cut=-1,camX=0,camY=0,clock=0,sparks=[],bannerT=0;
 // 에너지: 한 칸 오를 때마다 GAIN만큼 차고, 높이 갈수록 빨리 닳아요.
 // 1200칸 이상에서는 가득 찬 상태로도 약 1.2초 만에 바닥나요(초당 7번 이상 눌러야 버팀).
 const GAIN=.11;
@@ -349,7 +349,7 @@ function startGame(){
   if(ONLINE&&!ME){openLogin();return;}
   if(!unlocked(charId))charId='poly';
   startRun();
-  dodgeLeft=charId==='snuwolf'?1:0;dodgeFx=null;slowT=0;$('dodge').className=dodgeLeft?'on':'';$('dodgeTxt').style.opacity=0;
+  playT=0;dodgeLeft=charId==='snuwolf'?1:0;dodgeFx=null;slowT=0;$('dodge').className=dodgeLeft?'on':'';$('dodgeTxt').style.opacity=0;
   trail=[];walkPh=walkTg=0;audio();resetSteps();idx=0;face=1;score=0;energy=1;started=false;fall=null;cut=-1;sparks=[];anim={t:1,fx:0,fy:0};
   camX=0;camY=0;show(null);
   $('hud').style.display='block';$('ctrl').style.display='flex';$('pauseBtn').style.display='block';$('zone').textContent='STAGE 1 · '+ZONES[0].name;updHud();
@@ -426,7 +426,7 @@ function gameOver(){
     d.insertAdjacentHTML('beforeend',`<span>새 캐릭터 해금! <b style="color:#fff;font-weight:400">${c.name}</b></span>`);U.appendChild(d);paintChar(cv,c.id,false);
   }
   if(fresh.length)setTimeout(fanfare,300);
-  lastGame={score:sc,char:charId,run:runId,done:false};
+  lastGame={score:sc,char:charId,run:runId,pt:Math.round(playT*10)/10,done:false};
   if(ME){
     const endP=endRun();
     saveDna(async()=>{await endP;return {run:lastGame.run||''};});
@@ -504,7 +504,7 @@ function saveDna(fn){
   const job=dnaChain.then(async()=>{
     const extra=await fn();if(extra===null)return null;
     const wait=lastW+2300-Date.now();if(wait>0)await new Promise(r=>setTimeout(r,wait));
-    const d=ME.dna,body=Object.assign({name:ME.rec.name,top:d.top||0,best:d.best||0,plays:d.plays||0},d.bc?{bc:d.bc}:{},d.at?{at:d.at}:{},extra,{t:{'.sv':'timestamp'}});
+    const d=ME.dna,body=Object.assign({name:ME.rec.name,top:d.top||0,best:d.best||0,plays:d.plays||0},d.bc?{bc:d.bc}:{},d.at?{at:d.at}:{},d.pt!=null?{pt:d.pt}:{},extra,{t:{'.sv':'timestamp'}});
     await dbWrite('PATCH','/dna/players/'+ME.id,body);lastW=Date.now();
     Object.assign(ME.dna,body);delete ME.dna.t;
     return true;
@@ -532,7 +532,7 @@ async function register(){
   if(!g.run){$('regMsg').textContent='이번 판 기록이 서버에 남지 않아서 등록할 수 없어요.';return;}
   b.disabled=true;b.textContent='등록 중…';
   try{
-    await saveDna(async()=>({best:g.score,bc:g.char,at:{'.sv':'timestamp'},run:g.run}));
+    await saveDna(async()=>({best:g.score,bc:g.char,pt:g.pt,at:{'.sv':'timestamp'},run:g.run}));
     g.done=true;setReg();fanfare();
     try{const all=await dbGet('/dna/players')||{};const rk=1+Object.values(all).filter(r=>r&&(r.best||0)>g.score).length;$('regMsg').textContent=`전교 ${rk}위에 올랐어요!`;}catch(e){}
     renderMain();
@@ -910,7 +910,7 @@ function frame(now){
     if(countT<=0){state='play';started=true;$('count').textContent='GO!';$('count').className='go';beep(880,.18,'square',.05);setTimeout(()=>{if(state==='play')$('count').style.display='none';},500);}
   }
   if(state==='play'){
-    if(started){energy-=drain()*dt;if(energy<=0){energy=0;updHud();die('energy');}else{const f=$('gfill');f.style.width=(Math.ceil(energy*25)*4)+'%';f.classList.toggle('low',energy<.3);}}
+    if(started){playT+=rdt;energy-=drain()*dt;if(energy<=0){energy=0;updHud();die('energy');}else{const f=$('gfill');f.style.width=(Math.ceil(energy*25)*4)+'%';f.classList.toggle('low',energy<.3);}}
     if(anim.t<1){anim.t=Math.min(1,anim.t+dt/.12);if(anim.t>=1){landT=.18;landDust();}}
     if(landT>0)landT=Math.max(0,landT-dt);if(turnT>0)turnT=Math.max(0,turnT-dt);
   }
