@@ -375,13 +375,16 @@ if(!CHARS.some(c=>c.id===charId))charId='poly';
 
 /* ---------- 계단 생성 ---------- */
 // TL[i]: 원래 가닥이 i번째 염기쌍의 왼쪽 끝에 붙어 있는지. 방향이 바뀌는 곳에서만 좌우가 엇갈려요.
+// 시드가 있는 난수: 같은 시드면 같은 계단·같은 LUCKY 결과가 나와서, 관리자가 입력 기록을 그대로 다시 돌려 검증할 수 있어요
+function rng32(a){a>>>=0;return function(){a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};}
+let stairRnd=Math.random,luckRnd=Math.random,seed=0,inBits=[],inT=[],gT=0,logP=Promise.resolve();
 let X=[],P=[],TL=[],curDir=1,runLeft=0;
 function resetSteps(){X=[0];P=[PAIRS[0]];TL=[true];curDir=1;runLeft=4;genTo(60);}
 function genTo(n){
   while(X.length<=n){
-    if(runLeft<=0){curDir=-curDir;runLeft=1+Math.floor(Math.pow(Math.random(),1.4)*6);}
+    if(runLeft<=0){curDir=-curDir;runLeft=1+Math.floor(Math.pow(stairRnd(),1.4)*6);}
     const i=X.length;
-    X.push(X[i-1]+curDir);P.push(PAIRS[Math.floor(Math.random()*4)]);runLeft--;
+    X.push(X[i-1]+curDir);P.push(PAIRS[Math.floor(stairRnd()*4)]);runLeft--;
     const turned=i>=2&&(X[i]-X[i-1])!==(X[i-1]-X[i-2]);
     TL.push(turned?!TL[i-1]:TL[i-1]);
   }
@@ -413,6 +416,7 @@ function startGame(){
   if(!unlocked(charId))charId='poly';
   startRun();
   playT=0;dodgeLeft=charId==='snuwolf'?1:0;dodgeFx=null;slowT=0;clearTimeout(skT);$('dodge').className=dodgeLeft?'on':'';$('dodge').querySelector('.rd').textContent='READY';$('dodgeTxt').style.opacity=0;
+  seed=(Math.random()*4294967296)>>>0;stairRnd=rng32(seed);luckRnd=rng32(seed^0x51ED27);inBits=[];inT=[];gT=0;
   trail=[];walkPh=walkTg=0;audio();resetSteps();idx=0;face=1;score=0;energy=1;started=false;fall=null;cut=-1;sparks=[];anim={t:1,fx:0,fy:0};
   camX=0;camY=0;show(null);
   $('hud').style.display='block';$('ctrl').style.display='flex';$('pauseBtn').style.display='block';$('zone').textContent='STAGE 1 · '+ZONES[0].name;updHud();
@@ -425,7 +429,7 @@ function pauseGame(){
   state='pause';show('pause');
 }
 function resumeGame(){show(null);state='play';}
-function toMenu(){renderMain();$('pauseBtn').style.display='none';$('ctrl').style.display='none';$('count').style.display='none';show('menu');state='menu';resetSteps();idx=0;face=1;camX=0;camY=0;fall=null;cut=-1;anim={t:1,fx:0,fy:0};$('hud').style.display='none';}
+function toMenu(){stairRnd=Math.random;renderMain();$('pauseBtn').style.display='none';$('ctrl').style.display='none';$('count').style.display='none';show('menu');state='menu';resetSteps();idx=0;face=1;camX=0;camY=0;fall=null;cut=-1;anim={t:1,fx:0,fy:0};$('hud').style.display='none';}
 function openPick(){audio();buildPick();show('pick');pickAnim();}
 // 선택 화면: 열린 캐릭터는 게임에서처럼 숨 쉬어요 (초당 약 12번 다시 그려요)
 let pickRaf=0,pickLast=0;
@@ -460,12 +464,13 @@ function act(turn,forceWrong){
   if(slowT>0)return;   // 늑대의 회피 중에는 입력을 받지 않아요 (연타가 이어져 바로 죽지 않게)
   if(forceWrong){genTo(idx+2);turn=X[idx+1]-X[idx]===face;}   // 오토 스텝: ↓ 키·버튼 바깥 터치 = 일부러 잘못 누른 것 (늑대의 회피도 그대로 작동)
   else if(isTest()){genTo(idx+2);turn=X[idx+1]-X[idx]!==face;}
+  inBits.push(turn?1:0);inT.push(Math.round(gT*100));   // 입력 기록: 방향 전환 여부 + 그때의 게임 시간(0.01초)
   if(turn){face=-face;turnT=.18;turnDir=face;tailSwish=.75;swPh=0;}
   genTo(idx+40);idleT=0;
   const fx=X[idx],fy=idx;
   // 스널피 특전 '늑대의 회피': 첫 실수는 100% 피하고, 그 뒤 실수는 10% 확률로 피해요 (LUCKY). 피하면 맞는 계단으로 올라가요.
   const wrongNow=X[idx+1]-X[idx]!==face;
-  const lucky=wrongNow&&dodgeLeft===0&&charId==='snuwolf'&&Math.random()<LUCKY_P;
+  const lucky=wrongNow&&dodgeLeft===0&&charId==='snuwolf'&&luckRnd()<LUCKY_P;
   if(wrongNow&&(dodgeLeft>0||lucky)){
     dodgeLeft=0;const wrong=face;
     if(face!==X[idx+1]-X[idx]){face=X[idx+1]-X[idx];turnT=.18;turnDir=face;}
@@ -493,6 +498,12 @@ function act(turn,forceWrong){
     if(z>0){$('banner').innerHTML='<span class="px" style="font-size:13px">STAGE '+(z+1)+'</span><br>'+ZONES[z].name+' 도착!';$('banner').classList.add('show');bannerT=1.8;$('zone').textContent='STAGE '+(z+1)+' · '+ZONES[z].name;fanfare();}
     updHud();
   }else die('miss');
+}
+const B64='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+function packLog(n){
+  let t='';for(let i=0;i<inBits.length;i+=6){let v=0;for(let k=0;k<6;k++)v|=(inBits[i+k]||0)<<k;t+=B64[v];}
+  const g=inT.map((v,i)=>(v-(i?inT[i-1]:0)).toString(36)).join(',');
+  return {seed,ch:charId,n,k:inBits.length,t,g,pt:Math.round(playT*10)/10,au:isTest(),s:{'.sv':'timestamp'}};
 }
 function die(why){
   state='fall';
@@ -522,7 +533,9 @@ function gameOver(){
   lastGame={score:sc,char:charId,run:runId,pt:Math.round(playT*10)/10,done:false};
   if(ME){
     const endP=endRun();
-    saveDna(async()=>{await endP;return {run:lastGame.run||''};});
+    // 랭킹 기록보다 높은 판은 입력 기록을 서버에 남겨요 (관리자 검증용, 이게 있어야 최고 기록·랭킹 등록이 저장돼요)
+    if(sc>(ME.dna.best||0)){const log=packLog(sc),uid0=ME.id;logP=endP.then(ok=>ok&&lastGame.run?dbWrite('PUT','/dna/logs/'+uid0+'/'+lastGame.run,log):null).catch(()=>{});}
+    saveDna(async()=>{await endP;await logP;return {run:lastGame.run||''};});
   }
   setReg();renderMain();
   show('over');
@@ -1096,7 +1109,7 @@ function frame(now){
     if(countT<=0){state='play';started=true;$('count').textContent='GO!';$('count').className='go';beep(880,.18,'square',.05);setTimeout(()=>{if(state==='play')$('count').style.display='none';},500);}
   }
   if(state==='play'){
-    if(started){playT+=rdt;energy-=drain()*dt;if(energy<=0){energy=0;updHud();die('energy');}else{const f=$('gfill');f.style.width=(Math.ceil(energy*25)*4)+'%';f.classList.toggle('low',energy<.3);}}
+    if(started){playT+=rdt;gT+=dt;energy-=drain()*dt;if(energy<=0){energy=0;updHud();die('energy');}else{const f=$('gfill');f.style.width=(Math.ceil(energy*25)*4)+'%';f.classList.toggle('low',energy<.3);}}
     if(anim.t<1){anim.t=Math.min(1,anim.t+dt/.12);if(anim.t>=1){landT=.18;landDust();}}
     if(landT>0)landT=Math.max(0,landT-dt);if(turnT>0)turnT=Math.max(0,turnT-dt);
   }
