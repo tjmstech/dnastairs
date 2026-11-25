@@ -10,7 +10,9 @@
 <style>
 html,body{margin:0;height:100%;background:#0a0e2a;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;font-family:'Jua',system-ui,sans-serif;color:#fff}
 canvas{image-rendering:pixelated;image-rendering:crisp-edges}
-#c{position:fixed;left:0;top:0;display:block}
+#c{position:fixed;left:0;top:0;display:block;touch-action:none}
+/* 태블릿·큰 화면: 글자·버튼·창을 화면 크기에 맞춰 키워요 (--k, 게임 화면 자체의 크기는 그대로) */
+#hud,#banner,#count,#pauseBtn,#toast,.scr .card{zoom:var(--k,1)}
 .px{font-family:'Press Start 2P',monospace}
 #hud{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:50%;transform:translateX(-50%);width:min(60%,290px);padding:12px 14px 12px;text-align:center;display:none;pointer-events:none;background:rgba(11,15,42,.78);border:3px solid rgba(255,255,255,.85);box-shadow:0 0 0 3px #0b0f2a}
 #score{font-family:'Press Start 2P',monospace;font-size:34px;line-height:1;text-shadow:3px 3px 0 #0b0f2a}
@@ -24,9 +26,9 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 #count.go{color:#3ddc84;font-size:56px}
 #pauseBtn{position:fixed;top:calc(env(safe-area-inset-top) + 12px);right:10px;width:46px;height:46px;display:none;background:#ffcf4a;border:4px solid #0b0f2a;box-shadow:inset -3px -3px 0 #c99a1c,inset 3px 3px 0 #ffe9a0,0 4px 0 #0b0f2a;padding:0;-webkit-tap-highlight-color:transparent}
 #pauseBtn svg{width:22px;height:22px;shape-rendering:crispEdges}
-#ctrl{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 18px);display:none;justify-content:space-between;gap:16px;padding:0 18px;box-sizing:border-box}
-.cb{flex:1;max-width:210px;height:90px;border:4px solid #0b0f2a;border-radius:0;color:#fff;font:inherit;font-size:21px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;touch-action:none;-webkit-tap-highlight-color:transparent;text-shadow:2px 2px 0 rgba(0,0,0,.45)}
-.cb svg{width:30px;height:30px;shape-rendering:crispEdges}
+#ctrl{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 18px*var(--k,1));touch-action:none;display:none;justify-content:space-between;gap:16px;padding:0 18px;box-sizing:border-box}
+.cb{flex:1;max-width:calc(210px*var(--k,1));height:calc(90px*var(--k,1));border:4px solid #0b0f2a;border-radius:0;color:#fff;font:inherit;font-size:calc(21px*var(--k,1));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;touch-action:none;-webkit-tap-highlight-color:transparent;text-shadow:2px 2px 0 rgba(0,0,0,.45)}
+.cb svg{width:calc(30px*var(--k,1));height:calc(30px*var(--k,1));shape-rendering:crispEdges}
 #turnBtn{background:#6a55e0;box-shadow:inset -5px -5px 0 #4532a8,inset 5px 5px 0 #9a8cff,0 6px 0 #0b0f2a}
 #upBtn{background:#e8743c;box-shadow:inset -5px -5px 0 #a8461c,inset 5px 5px 0 #ffb27a,0 6px 0 #0b0f2a}
 .cb.on{transform:translateY(5px);box-shadow:inset 5px 5px 0 rgba(0,0,0,.25),0 1px 0 #0b0f2a!important}
@@ -197,6 +199,7 @@ a.sec.rk{text-decoration:none;box-sizing:border-box}
       <div class="sm">헛디디면 유전자 가위가 싹둑!<br>에너지가 다 닳기 전에 계속 올라가세요</div>
     </div>
     <button class="big" id="startBtn">시작하기</button>
+    <div id="rotHint" style="display:none;font-size:13px;color:#ffcf4a;margin:-2px 0 6px">태블릿은 세로로 세우면 화면이 더 크게 보여요</div>
     <div class="links">
       <a id="lnkRank" href="ranking.html">랭킹 보기</a>
       <a id="lnkHub" href="../">다른 게임</a>
@@ -314,6 +317,11 @@ function resize(){
   // 도트 한 칸 크기: 화면 폭에 비례하게 정하되, 실제 기기 픽셀 단위로 맞춰서 선명하게 (기기마다 크기 차이가 작아요)
   const PXd=Math.max(4,Math.round(Math.min(W/130,H/230)*DPR));PX=PXd/DPR;
   BW=Math.ceil(W/PX);BH=Math.ceil(H/PX);buf.width=BW;buf.height=BH;fx.width=BW;fx.height=BH;
+  // 화면 UI 배율: 휴대폰(약 390×800)은 1, 갤럭시 탭 S6 Lite 세로(약 800×1200)는 약 1.5
+  const k=Math.max(1,Math.min(1.7,Math.round(Math.min(W/390,H/800)*20)/20));
+  de.style.setProperty('--k',k);
+  // 터치 기기를 가로로 눕혀 쓰면 게임이 작게 보여서(위아래 시야는 모두 같아야 공정해요) 세로로 세우라고 알려 줘요
+  const rh=document.getElementById('rotHint');if(rh)rh.style.display=(W>H&&H<900&&matchMedia('(pointer:coarse)').matches)?'block':'none';
 }
 addEventListener('resize',resize);if(window.visualViewport)visualViewport.addEventListener('resize',resize);resize();
 // 아이폰: 로그인 키보드가 닫힌 뒤 크기 변경 알림이 늦거나 안 올 때가 있어서 한 번 더 확인해요
@@ -324,6 +332,9 @@ setInterval(()=>{const de=document.documentElement;if(Math.round(de.clientWidth)
 document.addEventListener('touchmove',e=>{if(e.touches.length>1||!e.target.closest('.scr'))e.preventDefault();},{passive:false});
 let lastTouchEnd=0;document.addEventListener('touchend',e=>{const n=Date.now();if(n-lastTouchEnd<350&&!e.target.closest('input,a,select'))e.preventDefault();lastTouchEnd=n;},{passive:false});
 document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
+// 게임 버튼·화면을 빠르게 연타하면 일부 브라우저(삼성 인터넷의 '항상 확대 허용' 등)가 두 번 탭 확대·두 손가락 확대로 착각해요.
+// 버튼은 pointerdown으로 동작하므로, 터치의 기본 동작(확대·스크롤)만 처음부터 막아요.
+document.addEventListener('touchstart',e=>{if(e.target===cv||(e.target.closest&&e.target.closest('#ctrl')))e.preventDefault();},{passive:false});
 
 /* ---------- 픽셀 그리기 도구 ---------- */
 function R(x,y,w,h,c){b.fillStyle=c;b.fillRect(Math.round(x),Math.round(y),w,h);}
