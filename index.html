@@ -73,6 +73,7 @@ h2{font-size:30px;margin:0 0 4px;font-weight:400;text-shadow:3px 3px 0 #0b0f2a}
 .why2{font-size:15px;opacity:.8;margin:4px 0 10px}
 .res{font-family:'Press Start 2P',monospace;font-size:50px;line-height:1;margin:10px 0 6px;text-shadow:4px 4px 0 #0b0f2a}
 .resl{font-size:17px;opacity:.85}
+.otime{display:flex;justify-content:center;align-items:center;gap:6px;margin-top:8px;font-family:'Press Start 2P',monospace;font-size:11px;color:#cfd3f0}.otime .clk{width:15px;height:15px;flex:none}.otime small{font-family:inherit;font-size:9px;opacity:.75}
 .reach{display:inline-block;margin-top:12px;padding:6px 12px;background:#0b0f2a;border:3px solid #ffcf4a;color:#ffcf4a;font-size:17px}
 .newb{display:inline-block;margin-top:10px;padding:4px 12px;background:#ffcf4a;color:#4a2a00;font-size:16px;border:3px solid #0b0f2a}
 /* 캐릭터 선택 */
@@ -275,6 +276,7 @@ a.sec.rk{text-decoration:none;box-sizing:border-box}
     <div class="why2" id="oWhy2"></div>
     <div class="res" id="oScore">0</div>
     <div class="resl">쌍 이어 붙였어요</div>
+    <div class="otime" id="oTime"></div>
     <div class="reach" id="oReach"></div>
     <div id="oNew"></div>
     <div id="oUnlock"></div>
@@ -529,6 +531,7 @@ function gameOver(){
   if(fall.why==='miss'){$('oWhy').textContent='유전자 가위에 잘렸어요!';$('oWhy2').textContent='헛디딘 자리에 잘못된 염기가 붙어서 잘라냈어요';}
   else{$('oWhy').textContent='에너지가 다 떨어졌어요!';$('oWhy2').textContent='힘이 빠져서 가닥에서 떨어졌어요';}
   $('oScore').textContent=score;
+  $('oTime').innerHTML=playT>0?CLK+'<span>'+fmtT(playT)+'</span><small>· 1초에 '+(score/Math.max(playT,.1)).toFixed(1)+'쌍</small>':'';   // 플레이 시간 + 평균 속도
   $('oReach').textContent='STAGE '+(zoneAt(score)+1)+' '+ZONES[zoneAt(score)].name+'까지 올라갔어요';
   const prev=myTop(),sc=score,nb=sc>prev;
   if(ME){ME.dna.top=Math.max(prev,sc);ME.dna.plays=(ME.dna.plays||0)+1;}
@@ -674,7 +677,7 @@ async function why401(b){
     if(!b.run)return '게임 시작 기록이 서버에 남지 않았어요. 인터넷이 잠깐 끊겼던 것 같아요.';
     const r=await dbGet('/dna/runs/'+b.run);
     if(!r||!r.e)return '게임 끝 기록이 서버에 남지 않았어요. 인터넷이 잠깐 끊겼던 것 같아요.';
-    const cap=Math.floor((r.e-r.s)/60+30);
+    const cap=Math.floor((r.e-r.s)/50+30);
     if((b.top||0)>cap||(b.best||0)>cap)return '너무 빨리 올라가서 서버가 기록을 의심했어요.<small>('+Math.round((r.e-r.s)/1000)+'초 동안 최대 '+cap+'쌍까지 인정돼요)</small>';
     if(Date.now()-r.e>590000)return '게임이 끝나고 10분이 지나서 저장 시간이 지났어요.';
     return '입력 기록을 서버에 남기지 못했어요. 인터넷을 확인하고 다시 해 주세요.';
