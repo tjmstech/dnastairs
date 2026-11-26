@@ -103,7 +103,7 @@ select.tab{appearance:none;-webkit-appearance:none}
     <div class="panel" id="adminBar">
       <div><b>관리자 모드</b> · 학생마다 버튼이 나와요.</div>
       <div style="margin-top:4px;line-height:1.6">
-        <b>저장</b>: 랭킹 기록(쌍)을 직접 고쳐요. 0으로 저장하면 랭킹에서 빠지고 해금은 그대로예요.<br>
+        <b>저장</b>: 랭킹 기록(쌍)과 시간을 직접 고쳐요. 시간은 분:초(예: 4:01)로 적고, 비워 두고 저장하면 시간 표시가 지워져요. 기록을 0으로 저장하면 랭킹에서 빠지고 해금은 그대로예요.<br>
         <b>비번 초기화</b>: 오델로와 같은 계정이라 두 게임 비밀번호가 함께 초기화돼요. 기록은 그대로예요.<br>
         <b>삭제</b>: 이 학생의 DNA 계단 기록과 해금을 모두 지워요(되돌릴 수 없어요).
       </div>
@@ -217,14 +217,18 @@ function render(){
 function tools(r){
   const t=el('div','tools');
   const inp=el('input');inp.type='number';inp.value=r.best||0;
+  // 시간: '분:초'(예 4:01) 또는 초. 비우면 시간 표시를 지워요
+  const tin=el('input');tin.placeholder='시간 없음';tin.style.width='72px';tin.value=r.pt!=null?fmtT(r.pt):'';tin.title='분:초 (비우면 시간 지우기)';
   const sv=el('button','b','저장');sv.onclick=()=>{const v=Math.floor(+inp.value);if(!(v>=0&&v<=100000)){admErr('기록은 0~100000 사이 숫자예요.');return;}
-    call('PATCH','/dna/players/'+r.id,{best:v,top:Math.max(v,r.top||0),t:{'.sv':'timestamp'}});};
+    const ts=tin.value.trim();let pt=null;
+    if(ts){const m=ts.match(/^(\d+):(\d{1,2})$/);pt=m?(+m[1])*60+(+m[2]):+ts;if(!(pt>=0&&pt<=36000)||(m&&+m[2]>59)){admErr('시간은 분:초 (예: 4:01) 로 적거나 비워 주세요.');return;}}
+    call('PATCH','/dna/players/'+r.id,{best:v,top:Math.max(v,r.top||0),pt,t:{'.sv':'timestamp'}});};
   const rs=el('button','b yel','비번 초기화');rs.onclick=()=>arm(rs,'정말 초기화?',async()=>{
     try{const v=await (await fetch(DB+'/vo/players/'+r.id+'.json')).json();if(!v){admErr('계정을 찾을 수 없어요.');return;}
       call('PATCH','/vo/players/'+r.id,{uid:'',gen:(v.gen||0)+1,cur:null});admErr('');}catch(e){admErr('인터넷 연결을 확인해 주세요.');}});
   const del=el('button','b red','삭제');del.onclick=()=>arm(del,'한 번 더 누르면 삭제',()=>call('DELETE','/dna/players/'+r.id));
   const vf=el('button','b','검증');vf.onclick=()=>openVerify(r);
-  const lb=el('span','','랭킹 기록');t.append(lb,inp,sv,rs,vf,del);return t;
+  const lb=el('span','','랭킹 기록');const lt=el('span','','시간');t.append(lb,inp,lt,tin,sv,rs,vf,del);return t;
 }
 function arm(b,txt,fn){if(b.dataset.arm){delete b.dataset.arm;fn();}else{const o=b.textContent;b.dataset.arm=1;b.textContent=txt;setTimeout(()=>{if(b.dataset.arm){delete b.dataset.arm;b.textContent=o;}},3000);}}
 function admErr(t){$('admErr').textContent=t||'';}
